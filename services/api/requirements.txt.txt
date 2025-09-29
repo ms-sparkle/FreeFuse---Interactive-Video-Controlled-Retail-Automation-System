@@ -1,0 +1,38 @@
+Stand up API (/events/click, /telemetry, /health) with request logging, basic auth.
+
+
+Define event schemas (correlation_id, sku_id, track_id, device_id, ts).
+
+
+Add basic tests: idempotency (dedupe by correlation_id), retry/backoff, DLQ log.
+ Week 1 deliverables
+
+
+⚙️ API repo with CI, unit tests ≥70% on handlers
+
+
+🧪 Idempotency test + DLQ log file
+
+
+📜 Event schema doc (JSON examples)
+ Week 2 responsibilities
+
+
+Integrate detector + tracker (server or local module), emit bbox,class,track_id.
+
+
+Wire MQTT (or WS mock) publish for retail/clicks and retail/actions.
+
+
+Add metrics endpoints: p50/p90 click→ack latency, FPS, error rates.
+ Week 2 deliverables
+
+
+🤖 Minimal CV service producing track_id
+
+
+📡 MQTT publish/subscribe demo working
+
+
+📊 /metrics with p50/p90 + FPS
+
