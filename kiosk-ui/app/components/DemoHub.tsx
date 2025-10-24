@@ -7,10 +7,31 @@ interface DemoHubProps {
 
 export default function DemoHub({ onSelectDemo }: DemoHubProps) {
     const demoCategories = [
-        { id: 'retail_promo', title: 'Retail & Merchandising', description: 'Interactive shelf promotions and analytics.' },
-        { id: 'education_training', title: 'Education & Training', description: 'Simulations for staff and students.' },
-        { id: 'enterprise_integration', title: 'Enterprise Integration', description: 'Connecting with backend business systems.' },
-        { id: 'creator_content', title: 'Creator & Content', description: 'Tools for building custom campaigns.' },
+        {
+            id: 'skincare_quiz',
+            title: 'Skincare Recommendation Quiz',
+            description: 'A guided quiz to find the perfect product.'
+        },
+        {
+            id: 'pick_to_promo',
+            title: 'Pick-to-Promo (Tech Demo)',
+            description: 'Click video detections to trigger backend events.'
+        },
+        {
+            id: 'education_training',
+            title: 'Education & Training',
+            description: 'Simulations for staff and students.'
+        },
+        {
+            id: 'enterprise_integration',
+            title: 'Enterprise Integration',
+            description: 'Connecting with backend business systems.'
+        },
+        {
+            id: 'creator_content',
+            title: 'Creator & Content',
+            description: 'Tools for building custom campaigns.'
+        },
     ];
 
     return (

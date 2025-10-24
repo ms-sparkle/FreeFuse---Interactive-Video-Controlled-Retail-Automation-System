@@ -9,6 +9,7 @@ import DemoHub from './components/DemoHub';
 import ProductGridPage from './components/ProductGridPage';
 import CameraView from './components/CameraView';
 import Toast from './components/Toast';
+import SkincareQuiz from './components/SkinCareQuiz'; // <-- NEW IMPORT
 
 // --- MAIN APP ---
 export default function Home() {
@@ -36,7 +37,18 @@ export default function Home() {
         );
 
         switch (activeDemo) {
-            case 'retail_promo':
+            // --- NEW CASE ---
+            case 'skincare_quiz':
+                return (
+                    <>
+                        {/* Back button is optional for this flow, but good to have */}
+                        {backButton}
+                        <SkincareQuiz />
+                    </>
+                );
+
+            // --- RENAMED CASE ---
+            case 'pick_to_promo':
                 return (
                     <>
                         {backButton}
