@@ -1,8 +1,12 @@
 // src/app/components/CameraView.tsx
 import React, { useState, useEffect, useRef } from 'react';
-// --- CHANGE #1 ---
-// Import TelemetryPayload so we can use it
 import { Product, Detection, ClickPayload, ToastType, TelemetryPayload } from '../types';
+
+// --- TYPE DEFINITIONS FOR API RESPONSES ---
+// Define what success and failure look like
+type PostEventSuccess = { ok: true };
+type PostEventFailure = { ok: false; message: string };
+type PostEventResponse = Promise<PostEventSuccess | PostEventFailure>;
 
 // Mock data specific to this component
 const fakeDetections: Detection[] = [
@@ -11,18 +15,20 @@ const fakeDetections: Detection[] = [
     { id: 'detect_C', box: { top: '60%', left: '10%', width: '20%', height: '25%' } },
 ];
 
-// Mock API calls
-async function postEvent(payload: ClickPayload) {
+// --- MOCK API CALLS (CORRECTED) ---
+
+// --- CHANGE #1: Added the explicit 'PostEventResponse' return type ---
+async function postEvent(payload: ClickPayload): PostEventResponse {
     console.log('POST to /events/click:', payload);
-    if (Math.random() > 0.1) {
+
+    // --- CHANGE #2: Re-added the failure case to the mock ---
+    if (Math.random() > 0.1) { // 90% success
         return { ok: true };
-    } else {
+    } else { // 10% failure
         return { ok: false, message: 'Failed to record event.' };
     }
 }
 
-// --- CHANGE #2 ---
-// Replaced 'any' with the specific 'TelemetryPayload' type
 async function logTelemetry(payload: TelemetryPayload) {
     console.log('POST to /telemetry:', payload);
     return { ok: true };
@@ -42,6 +48,8 @@ interface CameraViewProps {
 
 export default function CameraView({ product, onClose, showToast }: CameraViewProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+
     const [activeDetection, setActiveDetection] = useState<string | null>(null);
     const [tryCount, setTryCount] = useState<number | null>(null);
 
@@ -50,33 +58,46 @@ export default function CameraView({ product, onClose, showToast }: CameraViewPr
         if (response.ok) setTryCount(response.count);
     };
 
+    // EFFECT #1: Handles Camera Setup & Teardown (Runs ONCE)
     useEffect(() => {
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-            .then(stream => { if (videoRef.current) videoRef.current.srcObject = stream; })
-            .catch(err => {
-                console.error("Error accessing camera", err);
+        const getCamera = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' }
+                });
+                streamRef.current = stream;
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                }
+            } catch (err) {
+                console.error("Error accessing camera, falling back to local video.", err);
                 if (videoRef.current) {
                     videoRef.current.src = "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
                     videoRef.current.loop = true;
                 }
-            });
-        fetchTryCount();
-
-        // Cleanup
-        return () => {
-            if (videoRef.current && videoRef.current.srcObject instanceof MediaStream) {
-                const stream = videoRef.current.srcObject;
-                const tracks = stream.getTracks();
-                tracks.forEach(track => track.stop());
             }
         };
+
+        getCamera();
+
+        return () => {
+            if (streamRef.current) {
+                const tracks = streamRef.current.getTracks();
+                tracks.forEach(track => track.stop());
+                console.log("Camera stream stopped successfully.");
+            }
+        };
+    }, []); // <-- Empty array means this effect runs only ONCE on mount/unmount
+
+    // EFFECT #2: Handles Data Fetching (Runs when product changes)
+    useEffect(() => {
+        fetchTryCount();
     }, [product.id]);
+
 
     const handleDetectionClick = async (detection: Detection) => {
         setActiveDetection(detection.id);
 
-        // --- CHANGE #3 (BUG FIX) ---
-        // This now uses the actual data instead of hardcoded empty strings
         const payload: ClickPayload = {
             timestamp: new Date().toISOString(),
             productId: product.id,
@@ -91,10 +112,14 @@ export default function CameraView({ product, onClose, showToast }: CameraViewPr
         logTelemetry({ event: 'detection_click_initiated', payload });
 
         const response = await postEvent(payload);
+
         if (response.ok) {
+            // Success: response type is { ok: true }
             showToast('Action successful!', 'success');
             fetchTryCount();
         } else {
+            // --- CHANGE #3: Removed '(as any)' ---
+            // Failure: TypeScript now knows response type is { ok: false, message: string }
             showToast(response.message || 'Action failed.', 'failure');
         }
         setTimeout(() => setActiveDetection(null), 300);

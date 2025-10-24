@@ -7,13 +7,19 @@ LandingPage.tsx: This is the welcome screen.
 It's the first thing a user sees and just has the "Start" button to enter the main app.
 
 DemoHub.tsx: This is the main menu or "encyclopedia" screen. 
-It shows the different categories of use cases (like "Retail" or "Education") that the user can choose to explore.
+It shows the different categories of use cases (like "Skincare Quiz" or "Creator Studio") that the user can choose to explore.
 
 ProductGridPage.tsx: This is the product catalog. 
 It displays the grid of selectable products for the "Retail & Merchandising" demo.
 
+SkincareQuiz.tsx: This is the guided quiz demo. 
+It's a multi-step flow that asks a shopper questions (like skin type) and gives them personalized product recommendations.
+
+CreatorStudio.tsx: This is the admin/creator panel. 
+It provides a UI for "creators" to upload, customize, and preview video content for the kiosk.
+
 CameraView.tsx: This is the interactive demo screen. 
-It shows the camera feed (or video fallback), overlays the clickable detection boxes, and handles the API calls when a user clicks one.
+It shows the camera feed (or video fallback), overlays the clickable detection boxes, and handles the API calls for the "Pick-to-Promo" demo.
 
 Toast.tsx: This is a notification pop-up. 
 It's a small, reusable component that just shows success or failure messages (like "Action successful!") and then disappears.

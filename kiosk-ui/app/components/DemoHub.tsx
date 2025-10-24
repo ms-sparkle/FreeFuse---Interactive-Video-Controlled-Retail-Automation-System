@@ -18,6 +18,11 @@ export default function DemoHub({ onSelectDemo }: DemoHubProps) {
             description: 'Click video detections to trigger backend events.'
         },
         {
+            id: 'creator_studio',
+            title: 'Creator Studio',
+            description: 'Upload and customize video content.'
+        },
+        {
             id: 'education_training',
             title: 'Education & Training',
             description: 'Simulations for staff and students.'
@@ -27,11 +32,7 @@ export default function DemoHub({ onSelectDemo }: DemoHubProps) {
             title: 'Enterprise Integration',
             description: 'Connecting with backend business systems.'
         },
-        {
-            id: 'creator_content',
-            title: 'Creator & Content',
-            description: 'Tools for building custom campaigns.'
-        },
+        
     ];
 
     return (
