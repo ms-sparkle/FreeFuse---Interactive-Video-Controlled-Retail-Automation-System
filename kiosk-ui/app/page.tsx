@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import SearchBar from "./SearchBar"; // ✅ add this line
+import SearchBar from "./SearchBar";
 
 // --- TYPE DEFINITIONS ---
 interface Product {
@@ -268,7 +268,7 @@ export default function Home() {
 
   return (
     <>
-      <SearchBar /> {/* ✅ your search bar appears at the top */}
+      <SearchBar /> {}
       {renderContent()}
       {selectedProduct && <CameraView product={selectedProduct} onClose={closeCamera} showToast={showToast} />}
       {toastInfo.show && <Toast message={toastInfo.message} type={toastInfo.type} onDismiss={() => setToastInfo({ ...toastInfo, show: false })} />}
