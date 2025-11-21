@@ -5,12 +5,14 @@ import React, { useState } from 'react';
 // Import shared types and components
 import { Product, ToastInfo, ToastType } from './types';
 import LandingPage from './components/LandingPage';
-import DemoHub from './components/DemoHub';
+//import DemoHub from './components/DemoHub';
+import WeaveStreamHub from './components/WeaveStreamHub';
 import ProductGridPage from './components/ProductGridPage';
 import CameraView from './components/CameraView';
 import Toast from './components/Toast';
 import SkincareQuiz from './components/SkinCareQuiz';
 import CreatorStudio from './components/CreatorStudio'; // <-- 1. NEW IMPORT
+import KeetraDemo from './components/KeetraDemo';
 
 // --- MAIN APP ---
 export default function Home() {
@@ -49,7 +51,6 @@ export default function Home() {
 
             case 'pick_to_promo':
                 return (
-                    // ... (this case remains the same)
                     <>
                         {backButton}
                         <ProductGridPage onProductSelect={setSelectedProduct} />
@@ -63,7 +64,7 @@ export default function Home() {
                     </>
                 );
 
-            // --- 2. NEW CASE ADDED HERE ---
+            // ---NEW CASES ADD HERE ---
             case 'creator_studio':
                 return (
                     <>
@@ -81,12 +82,14 @@ export default function Home() {
                     </>
                 );
 
+            case 'keetra_beauty':
+                return <KeetraDemo onExit={returnToHub} />;
+
             default:
-                return <DemoHub onSelectDemo={setActiveDemo} />;
+                return <WeaveStreamHub onSelectDemo={setActiveDemo} />;
         }
     };
 
-    // ... (rest of the component JSX remains exactly the same)
     return (
         <>
             {view === 'landing' ? (
