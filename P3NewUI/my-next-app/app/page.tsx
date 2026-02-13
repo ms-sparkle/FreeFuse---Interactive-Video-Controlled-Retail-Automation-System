@@ -8,7 +8,7 @@ export default function Home() {
             </h1>
             <p className="text-slate-400 mb-12 text-xl">Athlete Readiness System</p>
 
-            <Link href="/check-in">
+            <Link href="/login">
                 <button className="px-12 py-6 bg-white text-black text-2xl font-bold rounded-full hover:scale-105 transition-transform shadow-[0_0_40px_rgba(255,255,255,0.3)]">
                     TAP TO START
                 </button>
