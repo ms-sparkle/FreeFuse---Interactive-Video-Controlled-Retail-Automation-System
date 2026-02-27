@@ -14,7 +14,7 @@ export default function LoginPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
 
                 {/* OPTION 1: ATHLETE (Cyan Theme) */}
-                <Link href="/check-in" className="group relative">
+                <Link href="/login/athlete" className="group relative">
                     <div className="h-64 bg-slate-900 border border-slate-700 rounded-2xl flex flex-col items-center justify-center gap-4 transition-all duration-300 group-hover:border-cyan-500 group-hover:bg-slate-800 group-hover:shadow-[0_0_30px_rgba(6,182,212,0.15)] cursor-pointer">
                         <div className="p-4 bg-cyan-500/10 rounded-full group-hover:bg-cyan-500/20 transition-colors">
                             <User className="w-12 h-12 text-cyan-400" />
@@ -26,8 +26,8 @@ export default function LoginPage() {
                     </div>
                 </Link>
 
-                {/* OPTION 2: COACH (Amber Theme - Now Unlocked) */}
-                <Link href="/coach" className="group relative">
+                {/* OPTION 2: COACH (Amber Theme */}
+                <Link href="/login/coach" className="group relative">
                     <div className="h-64 bg-slate-900 border border-slate-700 rounded-2xl flex flex-col items-center justify-center gap-4 transition-all duration-300 group-hover:border-amber-500 group-hover:bg-slate-800 group-hover:shadow-[0_0_30px_rgba(245,158,11,0.15)] cursor-pointer">
 
                         <div className="p-4 bg-amber-500/10 rounded-full group-hover:bg-amber-500/20 transition-colors">
