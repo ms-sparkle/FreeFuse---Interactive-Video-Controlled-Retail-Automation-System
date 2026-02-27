@@ -1,15 +1,15 @@
 ﻿"use client";
+import Link from 'next/link';
 import React, { useState } from 'react';
 import { bodyFemaleFront } from '../assets/bodyFemaleFront';
 import { bodyFemaleBack } from '../assets/bodyFemaleBack';
 import { bodyFront } from '../assets/bodyFront';
 import { bodyBack } from '../assets/bodyBack';
+import { SvgFemaleWrapper } from './SvgFemaleWrapper';
+import { SvgMaleWrapper } from './SvgMaleWrapper';
 
 // Using anatomical SVG paths from react-native-body-highlighter (MIT License)
-// Use the front viewBox for all datasets
-const FRONT_VIEW_BOX = "-50 -40 734 1538";
-const FEMALE_BACK_TRANSLATE = "translate(-806 -40)";
-const MALE_BACK_TRANSLATE = "translate(-774 -40)";
+const BODYMAP_SCALE = 1.5;
 
 type SorenessRecord = {
   [key: string]: number;
@@ -57,10 +57,7 @@ export default function BodyMap() {
     ? (bodyVariant === 'female' ? bodyFemaleFront : bodyFront)
     : (bodyVariant === 'female' ? bodyFemaleBack : bodyBack);
 
-  const viewBox = FRONT_VIEW_BOX;
-  const backTransform = bodySide === 'back'
-    ? (bodyVariant === 'female' ? FEMALE_BACK_TRANSLATE : MALE_BACK_TRANSLATE)
-    : undefined;
+  const Wrapper = bodyVariant === 'female' ? SvgFemaleWrapper : SvgMaleWrapper;
 
   const saveSoreness = () => {
     if (activeMuscle) {
@@ -93,7 +90,7 @@ export default function BodyMap() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-8 items-center justify-center p-8 bg-slate-950 min-h-[600px] text-white">
+    <div className="relative flex flex-col md:flex-row gap-8 items-center justify-center p-8 bg-slate-950 min-h-[600px] text-white">
       
       {/* --- THE BODY MAP --- */}
       <div className="relative w-[300px] h-[600px]">
@@ -113,8 +110,16 @@ export default function BodyMap() {
             {bodyVariant === 'female' ? 'Female' : 'Male'}
           </button>
         </div>
-        <svg viewBox={viewBox} className="drop-shadow-2xl w-full h-full">
-          <g transform={backTransform}>
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10 px-3 py-1 text-xs uppercase tracking-widest bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded-full">
+          {bodySide === 'front' ? 'Front View' : 'Back View'}
+        </div>
+        <Wrapper
+          scale={BODYMAP_SCALE}
+          side={bodySide}
+          border="none"
+          className="drop-shadow-2xl"
+        >
+          <g>
             {/* Render Muscles */}
             {bodyData.map((muscle) => {
               // Skip hair and head for cleaner visualization
@@ -171,6 +176,7 @@ export default function BodyMap() {
                       onClick={() => handleMuscleClickWithSide(muscle.slug, 'common')}
                       onMouseEnter={() => handleMuscleHoverWithSide(muscle.slug, 'common')}
                       onMouseLeave={() => setHoveredMuscle(null)}
+                      pointerEvents="bounding-box"
                       fill={getMuscleColor(muscle.slug)}
                       stroke="white"
                       strokeWidth="2"
@@ -188,6 +194,7 @@ export default function BodyMap() {
                       onClick={() => handleMuscleClickWithSide(muscle.slug, 'left')}
                       onMouseEnter={() => handleMuscleHoverWithSide(muscle.slug, 'left')}
                       onMouseLeave={() => setHoveredMuscle(null)}
+                      pointerEvents="bounding-box"
                       fill={getMuscleColor(`${muscle.slug}_left`)}
                       stroke="white"
                       strokeWidth="2"
@@ -205,6 +212,7 @@ export default function BodyMap() {
                       onClick={() => handleMuscleClickWithSide(muscle.slug, 'right')}
                       onMouseEnter={() => handleMuscleHoverWithSide(muscle.slug, 'right')}
                       onMouseLeave={() => setHoveredMuscle(null)}
+                      pointerEvents="bounding-box"
                       fill={getMuscleColor(`${muscle.slug}_right`)}
                       stroke="white"
                       strokeWidth="2"
@@ -217,7 +225,7 @@ export default function BodyMap() {
               );
             })}
           </g>
-        </svg>
+        </Wrapper>
         
         {/* Helper Text */}
         <p className="text-center text-slate-500 mt-4 text-sm uppercase tracking-widest">
@@ -281,6 +289,13 @@ export default function BodyMap() {
           </div>
         )}
       </div>
+
+      <Link
+        href="/player-dashboard"
+        className="absolute bottom-6 right-6 px-5 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded-lg transition-colors shadow-lg"
+      >
+        Continue to Dashboard
+      </Link>
 
     </div>
   );
