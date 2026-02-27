@@ -2,7 +2,10 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, make sure you cd into P3NewUI/my-next-app
+First, make sure you cd into the correct folder in VS Code
+```bash
+cd P3NewUI/my-next-app
+```
 
 Then, make sure that npm is installed
 
