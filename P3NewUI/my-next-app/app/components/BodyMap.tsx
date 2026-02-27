@@ -1,4 +1,5 @@
 ﻿"use client";
+import Link from 'next/link';
 import React, { useState } from 'react';
 import { bodyFemaleFront } from '../assets/bodyFemaleFront';
 import { bodyFemaleBack } from '../assets/bodyFemaleBack';
@@ -89,7 +90,7 @@ export default function BodyMap() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-8 items-center justify-center p-8 bg-slate-950 min-h-[600px] text-white">
+    <div className="relative flex flex-col md:flex-row gap-8 items-center justify-center p-8 bg-slate-950 min-h-[600px] text-white">
       
       {/* --- THE BODY MAP --- */}
       <div className="relative w-[300px] h-[600px]">
@@ -108,6 +109,9 @@ export default function BodyMap() {
           >
             {bodyVariant === 'female' ? 'Female' : 'Male'}
           </button>
+        </div>
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10 px-3 py-1 text-xs uppercase tracking-widest bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded-full">
+          {bodySide === 'front' ? 'Front View' : 'Back View'}
         </div>
         <Wrapper
           scale={BODYMAP_SCALE}
@@ -285,6 +289,13 @@ export default function BodyMap() {
           </div>
         )}
       </div>
+
+      <Link
+        href="/player-dashboard"
+        className="absolute bottom-6 right-6 px-5 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded-lg transition-colors shadow-lg"
+      >
+        Continue to Dashboard
+      </Link>
 
     </div>
   );
