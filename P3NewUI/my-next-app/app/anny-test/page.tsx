@@ -65,7 +65,7 @@ export default function AnnyModelTest() {
 
         try {
             // Hit the real Python Backend with the Slider Data
-            const response = await fetch('http://localhost:8000/api/generate-mesh', {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/generate-mesh`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

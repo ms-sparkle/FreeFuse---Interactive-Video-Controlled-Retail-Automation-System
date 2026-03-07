@@ -1,3 +1,6 @@
 
 # Ignore IDE-specific folders
 /.vs/
+.vscode/
+CLAUDE.md
+
