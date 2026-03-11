@@ -1,14 +1,15 @@
-﻿from fastapi import FastAPI, HTTPException
+﻿import time
+import os
+import shutil
+import asyncio
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import asyncio
-import os
 
-# Import the Anny model (ensure you have it installed per their docs)
-# import anny 
-
+# 1. Initialize FastAPI
 app = FastAPI()
 
+# 2. CORS Setup (Crucial for Next.js communication)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"], 
@@ -17,7 +18,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 1. New Payload Shape (Matches your sliders!)
+# 3. Define the path to your Next.js public folder
+# Adjust "my-next-app" if your Next.js folder is named differently
+NEXT_PUBLIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "my-next-app", "public"))
+
 class BiometricPayload(BaseModel):
     height_cm: float
     estimated_bf_percent: float
@@ -26,37 +30,38 @@ class BiometricPayload(BaseModel):
 @app.post("/api/generate-mesh")
 async def generate_mesh(payload: BiometricPayload):
     try:
-        print(f"✅ Received parameters: Height: {payload.height_cm}, BF: {payload.estimated_bf_percent}, Muscle: {payload.muscle_mass_index}")
+        # Create a unique filename using a timestamp to bypass browser caching
+        timestamp = int(time.time())
+        filename = f"generated_twin_{timestamp}.glb"
+        filepath = os.path.join(NEXT_PUBLIC_DIR, filename)
         
-        # 2. RUN THE ACTUAL ANNY MODEL HERE
-        # (Check Anny's exact documentation for their semantic generation syntax)
-        """
-        model = anny.AnnyModel()
+        print(f"Generating new mesh: {filename}...")
         
-        # Pass the slider values into the parametric model
-        mesh_data = model.generate(
-            height=payload.height_cm,
-            body_fat=payload.estimated_bf_percent,
-            muscle=payload.muscle_mass_index
-        )
+        # --- AI GENERATION SIMULATION BLOCK ---
+        await asyncio.sleep(2) # Simulate processing time
         
-        # Save it as a .glb (GLTF) file - the industry standard for web 3D
-        output_filename = "generated_twin.glb"
-        model.export(mesh_data, f"../my-next-app/public/{output_filename}")
-        """
+        # Look for a base model to copy to simulate a newly generated file
+        base_model_path = os.path.join(NEXT_PUBLIC_DIR, "base_model.glb") 
+        fallback_path = os.path.join(NEXT_PUBLIC_DIR, "generated_twin.glb")
         
-        # Simulating the Anny processing time for now
-        await asyncio.sleep(2)
-        
+        if os.path.exists(base_model_path):
+            shutil.copy(base_model_path, filepath)
+        elif os.path.exists(fallback_path):
+            shutil.copy(fallback_path, filepath)
+        else:
+            raise Exception("No base .glb file found in Next.js public folder to simulate generation.")
+        # ----------------------------------------
+
+        print(f"Successfully saved to {filepath}")
+
+        # Return the exact URL path that Next.js needs to fetch
         return {
             "status": "success",
-            "message": "Mesh generated successfully",
-            # We tell Next.js exactly what file to load
-            "mesh_url": "/generated_twin.glb" 
+            "mesh_url": f"/{filename}"
         }
 
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"Error generating mesh: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/")
