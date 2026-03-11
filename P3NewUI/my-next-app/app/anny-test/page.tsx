@@ -54,7 +54,7 @@ function DemoHumanMesh({
         const clickY = e.point.y;
         let semanticBodyPart = "Core / Abdomen";
 
-        if (clickY > 1) semanticBodyPart = "Neck / Traps";
+        if (clickY > .85) semanticBodyPart = "Neck / Traps";
         else if (clickY > 0.55) semanticBodyPart = "Pectorals / Shoulders";
         else if (clickY > 0.3) semanticBodyPart = "Mid-Back / Lats";
         else if (clickY > 0) semanticBodyPart = "Abs / Obliques";
@@ -99,7 +99,8 @@ function DemoHumanMesh({
 export default function DemoDayVideo() {
     const router = useRouter();
     const [step, setStep] = useState<'intro' | 'scanning' | 'result'>('intro');
-    const [scanProgress, setScanProgress] = useState(0);
+    const [captureProgress, setCaptureProgress] = useState(0);
+    const [meshProgress, setMeshProgress] = useState(0);
     
     const [height, setHeight] = useState(175);
     const [muscle, setMuscle] = useState(8.0);
@@ -115,7 +116,8 @@ export default function DemoDayVideo() {
 
     const startScanProcess = async () => {
         setStep('scanning');
-        setScanProgress(0);
+        setCaptureProgress(0);
+        setMeshProgress(0);
 
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -124,13 +126,25 @@ export default function DemoDayVideo() {
             console.warn("Camera failed, continuing demo.");
         }
 
-        let progress = 0;
-        const interval = setInterval(() => {
-            progress += 5;
-            setScanProgress(progress);
-            if (progress >= 100) {
-                clearInterval(interval);
-                completeScan();
+        // Phase 1: Capturing Biometrics
+        let capProg = 0;
+        const capInterval = setInterval(() => {
+            capProg += 10;
+            setCaptureProgress(capProg);
+
+            if (capProg >= 100) {
+                clearInterval(capInterval);
+
+                // Phase 2: Generating Mesh (Starts after Phase 1 finishes)
+                let mProg = 0;
+                const mInterval = setInterval(() => {
+                    mProg += 10;
+                    setMeshProgress(mProg);
+                    if (mProg >= 100) {
+                        clearInterval(mInterval);
+                        completeScan();
+                    }
+                }, 150);
             }
         }, 150);
     };
@@ -187,19 +201,24 @@ export default function DemoDayVideo() {
                 )}
 
                 {step === 'scanning' && (
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl flex flex-col items-center max-w-3xl mx-auto">
-                        <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden border border-slate-700 mb-8">
-                            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover opacity-60" />
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                <Crosshair size={120} className="text-cyan-500/50 animate-pulse" />
-                            </div>
-                        </div>
-                        <div className="w-full">
+                    <div className="w-full space-y-6">
+                        {/* Bar 1: Capturing */}
+                        <div>
                             <div className="flex justify-between mb-2 text-sm text-cyan-500 font-mono">
-                                <span>Generating Mesh</span><span>{scanProgress}%</span>
+                                <span>Capturing Biometrics</span><span>{captureProgress}%</span>
                             </div>
                             <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                                <div className="h-full bg-cyan-500 transition-all duration-150" style={{ width: `${scanProgress}%` }}></div>
+                                <div className="h-full bg-cyan-500 transition-all duration-150" style={{ width: `${captureProgress}%` }}></div>
+                            </div>
+                        </div>
+
+                        {/* Bar 2: Generating Mesh (Faded out until Capture is done) */}
+                        <div className={`transition-opacity duration-500 ${captureProgress < 100 ? 'opacity-30' : 'opacity-100'}`}>
+                            <div className="flex justify-between mb-2 text-sm text-cyan-500 font-mono">
+                                <span>Generating 3D Mesh</span><span>{meshProgress}%</span>
+                            </div>
+                            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-cyan-500 transition-all duration-150" style={{ width: `${meshProgress}%` }}></div>
                             </div>
                         </div>
                     </div>
