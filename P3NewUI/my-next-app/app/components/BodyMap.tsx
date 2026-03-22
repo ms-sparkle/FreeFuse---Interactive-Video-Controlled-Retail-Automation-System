@@ -1,5 +1,6 @@
 ﻿"use client";
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import React, { useState } from 'react';
 import { bodyFemaleFront } from '../assets/bodyFemaleFront';
 import { bodyFemaleBack } from '../assets/bodyFemaleBack';
@@ -46,12 +47,15 @@ const getMuscleName = (slug: string): string => {
 };
 
 export default function BodyMap() {
+  const router = useRouter();
   const [sorenessData, setSorenessData] = useState<SorenessRecord>({});
   const [activeMuscle, setActiveMuscle] = useState<string | null>(null);
   const [hoveredMuscle, setHoveredMuscle] = useState<string | null>(null);
   const [currentLevel, setCurrentLevel] = useState(5);
   const [bodyVariant, setBodyVariant] = useState<'female' | 'male'>('female');
   const [bodySide, setBodySide] = useState<'front' | 'back'>('front');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const bodyData = bodySide === 'front'
     ? (bodyVariant === 'female' ? bodyFemaleFront : bodyFront)
@@ -66,6 +70,28 @@ export default function BodyMap() {
         [activeMuscle]: currentLevel
       }));
       setActiveMuscle(null);
+    }
+  };
+
+  const submitCheckIn = async () => {
+    const raw = localStorage.getItem('session');
+    if (!raw) { setSubmitError('Not logged in.'); return; }
+    const session = JSON.parse(raw);
+    if (Object.keys(sorenessData).length === 0) { setSubmitError('Mark at least one muscle before submitting.'); return; }
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      const res = await fetch('/api/check-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ athleteId: session.personId, soreness: sorenessData }),
+      });
+      if (!res.ok) { const d = await res.json(); setSubmitError(d.error ?? 'Submission failed.'); return; }
+      router.push('/player-dashboard');
+    } catch {
+      setSubmitError('Network error. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -292,10 +318,23 @@ export default function BodyMap() {
 
       <Link
         href="/player-dashboard"
-        className="absolute bottom-6 right-6 px-5 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded-lg transition-colors shadow-lg"
+        className="absolute bottom-6 right-6 px-5 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition-colors shadow-lg text-sm"
       >
-        Continue to Dashboard
+        Skip &rarr; Dashboard
       </Link>
+
+      <div className="absolute bottom-6 left-6 flex flex-col items-start gap-2">
+        {Object.keys(sorenessData).length > 0 && (
+          <button
+            onClick={submitCheckIn}
+            disabled={submitting}
+            className="px-5 py-3 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black font-bold rounded-lg transition-colors shadow-lg"
+          >
+            {submitting ? 'Submitting...' : `Submit Check-in (${Object.keys(sorenessData).length} muscles)`}
+          </button>
+        )}
+        {submitError && <p className="text-red-400 text-sm">{submitError}</p>}
+      </div>
 
     </div>
   );
