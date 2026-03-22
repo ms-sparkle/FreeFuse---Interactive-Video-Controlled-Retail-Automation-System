@@ -1,113 +1,84 @@
 BEGIN TRANSACTION;
+
 CREATE TABLE IF NOT EXISTS "ACCOUNT" (
-	"AccountID"	INTEGER,
-	"Username"	TEXT NOT NULL UNIQUE,
-	"PasswordHash"	TEXT NOT NULL,
-	PRIMARY KEY("AccountID" AUTOINCREMENT)
+    "AccountID"    INTEGER,
+    "Username"     TEXT NOT NULL UNIQUE,
+    "PasswordHash" TEXT NOT NULL,
+    PRIMARY KEY("AccountID" AUTOINCREMENT)
 );
-CREATE TABLE IF NOT EXISTS "ATHLETE" (
-	"PersonID"	INTEGER,
-	"HoursSpentWorkingOut"	REAL,
-	"SportPlayed"	TEXT,
-	"Team"	TEXT,
-	PRIMARY KEY("PersonID"),
-	FOREIGN KEY("PersonID") REFERENCES "PERSON"("PersonID")
-);
-CREATE TABLE IF NOT EXISTS "ATHLETE_COACH" (
-	"AthletePersonID"	INTEGER,
-	"CoachPersonID"	INTEGER,
-	PRIMARY KEY("AthletePersonID","CoachPersonID"),
-	FOREIGN KEY("AthletePersonID") REFERENCES "ATHLETE"("PersonID"),
-	FOREIGN KEY("CoachPersonID") REFERENCES "COACH"("PersonID")
-);
-CREATE TABLE IF NOT EXISTS "ATHLETE_SCORE_HISTORY" (
-	"ScoreID"	INTEGER,
-	"AthletePersonID"	INTEGER,
-	"ScoreDate"	DATE DEFAULT CURRENT_DATE,
-	"InjuryRiskScore"	INTEGER,
-	"ProgressScore"	INTEGER,
-	PRIMARY KEY("ScoreID" AUTOINCREMENT),
-	FOREIGN KEY("AthletePersonID") REFERENCES "ATHLETE"("PersonID")
-);
+
 CREATE TABLE IF NOT EXISTS "BODYPART" (
-	"BodyPartID"	INTEGER,
-	"BodyPartName"	TEXT NOT NULL,
-	"Side"	TEXT,
-	PRIMARY KEY("BodyPartID" AUTOINCREMENT)
+    "BodyPartID"   INTEGER,
+    "BodyPartName" TEXT NOT NULL,
+    "Side"         TEXT,
+    PRIMARY KEY("BodyPartID" AUTOINCREMENT)
 );
-CREATE TABLE IF NOT EXISTS "COACH" (
-	"PersonID"	INTEGER,
-	PRIMARY KEY("PersonID"),
-	FOREIGN KEY("PersonID") REFERENCES "PERSON"("PersonID")
-);
-CREATE TABLE IF NOT EXISTS "COACH_OBSERVATION" (
-	"ObservationID"	INTEGER,
-	"ObservationDate"	DATE DEFAULT CURRENT_DATE,
-	"Notes"	TEXT,
-	"CoachPersonID"	INTEGER,
-	"AthletePersonID"	INTEGER,
-	PRIMARY KEY("ObservationID" AUTOINCREMENT),
-	FOREIGN KEY("AthletePersonID") REFERENCES "ATHLETE"("PersonID"),
-	FOREIGN KEY("CoachPersonID") REFERENCES "COACH"("PersonID")
-);
+
 CREATE TABLE IF NOT EXISTS "PERSON" (
-	"PersonID"	INTEGER,
-	"FirstName"	TEXT NOT NULL,
-	"LastName"	TEXT NOT NULL,
-	"DateOfBirth"	DATE,
-	"AccountID"	INTEGER,
-	PRIMARY KEY("PersonID" AUTOINCREMENT),
-	FOREIGN KEY("AccountID") REFERENCES "ACCOUNT"("AccountID")
+    "PersonID"    INTEGER,
+    "FirstName"   TEXT NOT NULL,
+    "LastName"    TEXT NOT NULL,
+    "DateOfBirth" DATE,
+    "AccountID"   INTEGER,
+    PRIMARY KEY("PersonID" AUTOINCREMENT),
+    FOREIGN KEY("AccountID") REFERENCES "ACCOUNT"("AccountID")
 );
-CREATE TABLE IF NOT EXISTS "SORENESS_ENTRY" (
-	"EntryID"	INTEGER,
-	"ReportID"	INTEGER,
-	"BodyPartID"	INTEGER,
-	"SorenessLevel"	INTEGER,
-	"ReportDate"	DATE,
-	PRIMARY KEY("EntryID" AUTOINCREMENT),
-	FOREIGN KEY("BodyPartID") REFERENCES "BODYPART"("BodyPartID"),
-	FOREIGN KEY("ReportID") REFERENCES "SORENESS_REPORT"("ReportID")
-);
-CREATE TABLE IF NOT EXISTS "SORENESS_REPORT" (
-	"ReportID"	INTEGER,
-	"ReportDate"	DATE DEFAULT CURRENT_DATE,
-	"AthletePersonID"	INTEGER,
-	"ProgressScore"	INTEGER,
-	"InjuryRiskScore"	INTEGER,
-	PRIMARY KEY("ReportID" AUTOINCREMENT),
-	FOREIGN KEY("AthletePersonID") REFERENCES "ATHLETE"("PersonID")
-);
-CREATE TABLE IF NOT EXISTS "TRAINING_PLAN" (
-	"PlanID"	INTEGER,
-	"PlanName"	TEXT,
-	"CoachPersonID"	INTEGER,
-	"AthletePersonID"	INTEGER,
-	"WorkoutID"	INTEGER,
-	"Notes"	TEXT,
-	PRIMARY KEY("PlanID" AUTOINCREMENT),
-	FOREIGN KEY("AthletePersonID") REFERENCES "ATHLETE"("PersonID"),
-	FOREIGN KEY("CoachPersonID") REFERENCES "COACH"("PersonID"),
-	FOREIGN KEY("WorkoutID") REFERENCES "WORKOUT"("WorkoutID")
-);
+
 CREATE TABLE IF NOT EXISTS "WORKOUT" (
-	"WorkoutID"	INTEGER,
-	"WorkoutName"	TEXT NOT NULL,
-	"BodyPartID"	INTEGER,
-	"Duration"	INTEGER,
-	"Reps"	INTEGER,
-	PRIMARY KEY("WorkoutID" AUTOINCREMENT),
-	FOREIGN KEY("BodyPartID") REFERENCES "BODYPART"("BodyPartID")
+    "WorkoutID"   INTEGER,
+    "WorkoutName" TEXT NOT NULL,
+    "BodyPartID"  INTEGER,
+    "Duration"    INTEGER,
+    "Reps"        INTEGER,
+    PRIMARY KEY("WorkoutID" AUTOINCREMENT),
+    FOREIGN KEY("BodyPartID") REFERENCES "BODYPART"("BodyPartID")
 );
-CREATE TABLE IF NOT EXISTS "WORKOUT_SESSION" (
-	"SessionID"	INTEGER,
-	"SessionDate"	DATE DEFAULT CURRENT_DATE,
-	"AthletePersonID"	INTEGER,
-	"WorkoutID"	INTEGER,
-	"Notes"	TEXT,
-	PRIMARY KEY("SessionID" AUTOINCREMENT),
-	FOREIGN KEY("AthletePersonID") REFERENCES "ATHLETE"("PersonID"),
-	FOREIGN KEY("WorkoutID") REFERENCES "WORKOUT"("WorkoutID")
+
+CREATE TABLE IF NOT EXISTS "ATHLETE" (
+    "PersonID"             INTEGER,
+    "HoursSpentWorkingOut" REAL,
+    "SportPlayed"          TEXT,
+    "Team"                 TEXT,
+    "Sex"                  TEXT,    -- Added to match your INSERT
+    "Height"               INTEGER, -- Added to match your INSERT
+    "Weight"               INTEGER, -- Added to match your INSERT
+    PRIMARY KEY("PersonID"),
+    FOREIGN KEY("PersonID") REFERENCES "PERSON"("PersonID")
+);
+
+CREATE TABLE IF NOT EXISTS "COACH" (
+    "PersonID" INTEGER,
+    PRIMARY KEY("PersonID"),
+    FOREIGN KEY("PersonID") REFERENCES "PERSON"("PersonID")
+);
+
+CREATE TABLE IF NOT EXISTS "ATHLETE_COACH" (
+    "AthletePersonID" INTEGER,
+    "CoachPersonID"   INTEGER,
+    PRIMARY KEY("AthletePersonID","CoachPersonID"),
+    FOREIGN KEY("AthletePersonID") REFERENCES "ATHLETE"("PersonID"),
+    FOREIGN KEY("CoachPersonID") REFERENCES "COACH"("PersonID")
+);
+
+CREATE TABLE IF NOT EXISTS "SORENESS_REPORT" (
+    "ReportID"         INTEGER,
+    "ReportDate"       DATE DEFAULT CURRENT_DATE,
+    "AthletePersonID"  INTEGER,
+    "ProgressScore"    INTEGER,
+    "InjuryRiskScore"  INTEGER,
+    PRIMARY KEY("ReportID" AUTOINCREMENT),
+    FOREIGN KEY("AthletePersonID") REFERENCES "ATHLETE"("PersonID")
+);
+
+CREATE TABLE IF NOT EXISTS "SORENESS_ENTRY" (
+    "EntryID"       INTEGER,
+    "ReportID"      INTEGER,
+    "BodyPartID"    INTEGER,
+    "SorenessLevel" INTEGER,
+    "ReportDate"    DATE,
+    PRIMARY KEY("EntryID" AUTOINCREMENT),
+    FOREIGN KEY("BodyPartID") REFERENCES "BODYPART"("BodyPartID"),
+    FOREIGN KEY("ReportID") REFERENCES "SORENESS_REPORT"("ReportID")
 );
 INSERT INTO "ACCOUNT" ("AccountID","Username","PasswordHash") VALUES (1,'c_smith','p1'),
  (2,'c_jones','p2'),
