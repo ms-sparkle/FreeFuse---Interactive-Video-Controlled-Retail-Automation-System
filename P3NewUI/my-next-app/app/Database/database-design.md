@@ -5,7 +5,7 @@ This document contains the ER diagram for the commercial athlete tracking system
 
 ---
 
-<img width="2185" height="2520" alt="Capstone ER Diagram" src="https://github.com/user-attachments/assets/0ee278b9-eed1-41b8-96de-c8a95a629693" />
+<img width="2385" height="2520" alt="Capstone ER Diagram (1)" src="https://github.com/user-attachments/assets/577e84ba-e78e-49b9-8628-844265a012c5" />
 
 
 ---
@@ -13,7 +13,7 @@ This document contains the ER diagram for the commercial athlete tracking system
 ## Relational Schema
 - ACCOUNT (AccountID [PK], Username [Unique], PasswordHash) 
 - PERSON (PersonID [PK], FirstName, LastName, DateOfBirth, AccountID [FK]) 
-- ATHLETE (PersonID [PK, FK to Person], HoursSpentWorkingOut, SportPlayed, Team)
+- ATHLETE (PersonID [PK, FK to Person], HoursSpentWorkingOut, SportPlayed, Team, Sex, Weight, Height)
 - COACH (PersonID [PK, FK to Person])
 - BODYPART (BodyPartID [PK], BodyPartName, Side)
 - WORKOUT (WorkoutID [PK], WorkoutName, BodyPartID [FK], Duration, Reps)
