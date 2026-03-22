@@ -116,11 +116,11 @@ INSERT INTO "ACCOUNT" ("AccountID","Username","PasswordHash") VALUES (1,'c_smith
  (5,'a_wilson','p5'),
  (6,'a_moore','p6'),
  (7,'a_taylor','p7');
-INSERT INTO "ATHLETE" ("PersonID","HoursSpentWorkingOut","SportPlayed","Team") VALUES (3,10.5,'Basketball','Lions'),
- (4,12.0,'Soccer','Eagles'),
- (5,8.0,'Swimming','Sharks'),
- (6,15.0,'Tennis','Aces'),
- (7,11.0,'Basketball','Lions');
+INSERT INTO "ATHLETE" ("PersonID","HoursSpentWorkingOut","SportPlayed","Team", "Sex", "Height", "Weight") VALUES (3,10.5,'Basketball','Lions', 'Male', 74, 210),
+ (4,12.0,'Soccer','Eagles', 'Male', 63, 187),
+ (5,8.0,'Swimming','Sharks', 'Female', 67, 160),
+ (6,15.0,'Tennis','Aces', 'Female', 55, 130),
+ (7,11.0,'Basketball','Lions', 'Male', 60, 122);
 INSERT INTO "ATHLETE_COACH" ("AthletePersonID","CoachPersonID") VALUES (3,1),
  (4,1),
  (5,1),
