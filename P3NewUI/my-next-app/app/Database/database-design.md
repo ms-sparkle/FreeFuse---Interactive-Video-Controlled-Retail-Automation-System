@@ -30,3 +30,5 @@ This document contains the ER diagram for the commercial athlete tracking system
 - The system is designed for a commercial athlete tracking platform.
 - Workouts and training plans use a many-to-many relationship via a junction table.
 - The schema follows Third Normal Form (3NF).
+- Height is in inches
+- Weight is in pounds
