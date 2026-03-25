@@ -1,4 +1,20 @@
+"use client";
 import { Activity, CalendarDays, Dumbbell, ShieldCheck, Target, TrendingUp } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+// placeholder for dynamic data pulling in
+// will need to splice data to most recent 7 days for the graph
+const data = [
+  { day: 'Feb 16', sessions: 4, duration: 40 },
+  { day: 'Feb 17', sessions: 6, duration: 50 },
+  { day: 'Feb 18', sessions: 3, duration: 25 },
+  { day: 'Feb 19', sessions: 4, duration: 40 },
+  { day: 'Feb 21', sessions: 6, duration: 51 },
+  { day: 'Feb 22', sessions: 3, duration: 24 },
+  { day: 'Feb 23', sessions: 4, duration: 40 },
+  { day: 'Feb 24', sessions: 6, duration: 45 },
+  { day: 'Feb 25', sessions: 3, duration: 22 },
+];
 
 const recommendations = [
   {
@@ -96,100 +112,42 @@ export default function PlayerDashboard() {
             Workout Progress
           </h2>
           <p className="text-slate-400 mb-5">Your training activity over the last 7 days</p>
-
-          <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4 md:p-5">
-            <svg viewBox="0 0 900 260" className="w-full h-auto" role="img" aria-label="Workout progress chart">
-              <g stroke="#334155" strokeWidth="1" strokeDasharray="4 4">
-                <line x1="50" y1="30" x2="850" y2="30" />
-                <line x1="50" y1="84" x2="850" y2="84" />
-                <line x1="50" y1="138" x2="850" y2="138" />
-                <line x1="50" y1="192" x2="850" y2="192" />
-                <line x1="50" y1="246" x2="850" y2="246" />
-                <line x1="50" y1="30" x2="50" y2="246" />
-                <line x1="183" y1="30" x2="183" y2="246" />
-                <line x1="316" y1="30" x2="316" y2="246" />
-                <line x1="449" y1="30" x2="449" y2="246" />
-                <line x1="582" y1="30" x2="582" y2="246" />
-                <line x1="715" y1="30" x2="715" y2="246" />
-                <line x1="850" y1="30" x2="850" y2="246" />
-              </g>
-
-              <polyline
-                fill="none"
-                stroke="#06b6d4"
-                strokeWidth="2.5"
-                points="50,120 183,84 316,156 449,46 582,108 715,66 850,30"
-              />
-              <polyline
-                fill="none"
-                stroke="#6366f1"
-                strokeWidth="2.5"
-                points="50,156 183,138 316,192 449,120 582,156 715,138 850,84"
-              />
-
-              {[
-                [50, 120],
-                [183, 84],
-                [316, 156],
-                [449, 46],
-                [582, 108],
-                [715, 66],
-                [850, 30],
-              ].map(([x, y]) => (
-                <circle key={`sessions-${x}`} cx={x} cy={y} r="3.5" fill="#0f172a" stroke="#06b6d4" strokeWidth="2" />
-              ))}
-              {[
-                [50, 156],
-                [183, 138],
-                [316, 192],
-                [449, 120],
-                [582, 156],
-                [715, 138],
-                [850, 84],
-              ].map(([x, y]) => (
-                <circle key={`duration-${x}`} cx={x} cy={y} r="3.5" fill="#0f172a" stroke="#6366f1" strokeWidth="2" />
-              ))}
-
-              <g fill="#94a3b8" fontSize="12">
-                <text x="18" y="250">0</text>
-                <text x="18" y="196">2</text>
-                <text x="18" y="142">4</text>
-                <text x="18" y="88">6</text>
-                <text x="18" y="34">8</text>
-
-                <text x="856" y="250">0</text>
-                <text x="856" y="196">20</text>
-                <text x="856" y="142">40</text>
-                <text x="856" y="88">60</text>
-                <text x="856" y="34">80</text>
-
-                <text x="38" y="16">Sessions</text>
-                <text x="850" y="16">Duration (min)</text>
-
-                <text x="40" y="262">Feb 16</text>
-                <text x="173" y="262">Feb 17</text>
-                <text x="306" y="262">Feb 18</text>
-                <text x="439" y="262">Feb 19</text>
-                <text x="572" y="262">Feb 20</text>
-                <text x="705" y="262">Feb 21</text>
-                <text x="838" y="262">Feb 23</text>
-              </g>
-            </svg>
-
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-800 pt-4">
-              <div className="text-center">
-                <div className="text-3xl font-semibold text-cyan-300">27</div>
-                <div className="text-sm text-slate-400">Total Sessions</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-semibold text-cyan-300">405</div>
-                <div className="text-sm text-slate-400">Total Minutes</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-semibold text-cyan-300">58</div>
-                <div className="text-sm text-slate-400">Avg Minutes/Session</div>
-              </div>
-            </div>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                <XAxis 
+                  dataKey="day" 
+                  stroke="#94a3b8" 
+                  fontSize={12} 
+                  tickLine={false} 
+                  axisLine={false} 
+                />
+                <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                
+                {/* THIS IS THE HOVER MAGIC */}
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
+                  itemStyle={{ color: '#06b6d4' }}
+                />
+                
+                <Line 
+                  type="monotone" 
+                  dataKey="sessions" 
+                  stroke="#06b6d4" 
+                  strokeWidth={3} 
+                  dot={{ r: 4, fill: '#06b6d4' }} 
+                  activeDot={{ r: 6, strokeWidth: 0 }} 
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="duration" 
+                  stroke="#6366f1" 
+                  strokeWidth={3} 
+                  dot={{ r: 4, fill: '#6366f1' }} 
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         </section>
 
