@@ -13,6 +13,12 @@ Then, make sure that npm is installed
 npm install
 ```
 
+Then, install recharts
+
+```bash
+npm install recharts
+```
+
 Then, to run the development server:
 
 ```bash
