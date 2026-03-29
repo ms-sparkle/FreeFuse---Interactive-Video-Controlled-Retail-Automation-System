@@ -1,0 +1,135 @@
+import { NextRequest, NextResponse } from 'next/server';
+import getDb from '@/lib/db';
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const personId = Number(id);
+
+    if (isNaN(personId)) {
+      return NextResponse.json({ error: 'Invalid player id' }, { status: 400 });
+    }
+
+    const db = getDb();
+
+    // Person + athlete info
+    const player = db.prepare(`
+      SELECT
+        p.PersonID,
+        p.FirstName,
+        p.LastName,
+        p.DateOfBirth,
+        a.SportPlayed,
+        a.Team,
+        a.Sex,
+        a.Height,
+        a.Weight,
+        a.HoursSpentWorkingOut
+      FROM PERSON p
+      JOIN ATHLETE a ON a.PersonID = p.PersonID
+      WHERE p.PersonID = ?
+    `).get(personId) as {
+      PersonID: number;
+      FirstName: string;
+      LastName: string;
+      DateOfBirth: string;
+      SportPlayed: string;
+      Team: string;
+      Sex: string;
+      Height: number;
+      Weight: number;
+      HoursSpentWorkingOut: number;
+    } | undefined;
+
+    if (!player) {
+      return NextResponse.json({ error: 'Player not found' }, { status: 404 });
+    }
+
+    // Latest soreness report
+    const latestReport = db.prepare(`
+      SELECT sr.ReportID, sr.ReportDate, sr.ProgressScore, sr.InjuryRiskScore
+      FROM SORENESS_REPORT sr
+      WHERE sr.AthletePersonID = ?
+      ORDER BY sr.ReportDate DESC
+      LIMIT 1
+    `).get(personId) as {
+      ReportID: number;
+      ReportDate: string;
+      ProgressScore: number;
+      InjuryRiskScore: number;
+    } | undefined;
+
+    // Soreness entries for the latest report
+    const sorenessEntries = latestReport
+      ? (db.prepare(`
+          SELECT se.BodyPartID, se.SorenessLevel, bp.BodyPartName, bp.Side
+          FROM SORENESS_ENTRY se
+          JOIN BODYPART bp ON bp.BodyPartID = se.BodyPartID
+          WHERE se.ReportID = ?
+        `).all(latestReport.ReportID) as {
+          BodyPartID: number;
+          SorenessLevel: number;
+          BodyPartName: string;
+          Side: string;
+        }[])
+      : [];
+
+    // Workout suggestions based on sore body parts
+    const workoutSuggestions = sorenessEntries.length > 0
+      ? (db.prepare(`
+          SELECT DISTINCT w.WorkoutName, w.Duration, w.Reps, bp.BodyPartName
+          FROM WORKOUT w
+          JOIN BODYPART bp ON bp.BodyPartID = w.BodyPartID
+          WHERE w.BodyPartID NOT IN (
+            SELECT se.BodyPartID FROM SORENESS_ENTRY se
+            JOIN SORENESS_REPORT sr ON sr.ReportID = se.ReportID
+            WHERE sr.AthletePersonID = ? AND se.SorenessLevel >= 5
+          )
+          LIMIT 3
+        `).all(personId) as {
+          WorkoutName: string;
+          Duration: number;
+          Reps: number;
+          BodyPartName: string;
+        }[])
+      : (db.prepare(`
+          SELECT w.WorkoutName, w.Duration, w.Reps, bp.BodyPartName
+          FROM WORKOUT w
+          JOIN BODYPART bp ON bp.BodyPartID = w.BodyPartID
+          LIMIT 3
+        `).all() as {
+          WorkoutName: string;
+          Duration: number;
+          Reps: number;
+          BodyPartName: string;
+        }[]);
+
+    // Recent workout sessions (last 7)
+    const sessions = db.prepare(`
+      SELECT ws.SessionDate, w.WorkoutName, ws.Notes
+      FROM WORKOUT_SESSION ws
+      JOIN WORKOUT w ON w.WorkoutID = ws.WorkoutID
+      WHERE ws.AthletePersonID = ?
+      ORDER BY ws.SessionDate DESC
+      LIMIT 7
+    `).all(personId) as {
+      SessionDate: string;
+      WorkoutName: string;
+      Notes: string;
+    }[];
+
+    return NextResponse.json({
+      player,
+      latestReport: latestReport ?? null,
+      sorenessEntries,
+      workoutSuggestions,
+      sessions,
+    });
+  } catch (err) {
+    console.error('Player fetch error:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

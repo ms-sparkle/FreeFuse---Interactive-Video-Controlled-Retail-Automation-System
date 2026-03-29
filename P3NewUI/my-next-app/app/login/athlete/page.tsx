@@ -1,7 +1,49 @@
+'use client';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { User, Lock, ArrowLeft } from 'lucide-react';
 
 export default function AthleteLogin() {
+    const router = useRouter();
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setError(data.error ?? 'Login failed');
+                return;
+            }
+            if (data.role !== 'athlete') {
+                setError('This account is not an athlete account');
+                return;
+            }
+            localStorage.setItem('session', JSON.stringify({
+                personId: data.personId,
+                firstName: data.firstName,
+                lastName: data.lastName,
+                role: data.role,
+            }));
+            router.push('/check-in');
+        } catch {
+            setError('Network error – please try again');
+        } finally {
+            setLoading(false);
+        }
+    }
+
     return (
         <main className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white relative">
 
@@ -20,13 +62,22 @@ export default function AthleteLogin() {
                     <p className="text-slate-400 text-sm mt-1">Access your daily readiness check-in</p>
                 </div>
 
-                <form className="space-y-5">
+                {error && (
+                    <div className="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                        {error}
+                    </div>
+                )}
+
+                <form className="space-y-5" onSubmit={handleSubmit}>
                     <div>
-                        <label className="block text-sm font-medium text-slate-400 mb-1">Username / Email</label>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">Username</label>
                         <input
                             type="text"
+                            value={username}
+                            onChange={e => setUsername(e.target.value)}
                             className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
-                            placeholder="athlete@team.com"
+                            placeholder="a_davis"
+                            required
                         />
                     </div>
 
@@ -35,26 +86,28 @@ export default function AthleteLogin() {
                         <div className="relative">
                             <input
                                 type="password"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
                                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
                                 placeholder="********"
+                                required
                             />
                             <Lock className="absolute right-4 top-3.5 text-slate-500 w-5 h-5" />
                         </div>
                     </div>
 
                     <div className="flex items-center justify-between text-sm">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" className="accent-cyan-500" />
-                            <span className="text-slate-400">Remember me</span>
-                        </label>
+                        <span />
                         <a href="/forgot-password?role=athlete" className="text-cyan-400 hover:text-cyan-300">Forgot password?</a>
                     </div>
 
-                    <Link href="/check-in" className="block mt-6">
-                        <button type="button" className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded-lg transition-colors">
-                            Sign In
-                        </button>
-                    </Link>
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full mt-6 py-3 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black font-bold rounded-lg transition-colors"
+                    >
+                        {loading ? 'Signing in…' : 'Sign In'}
+                    </button>
                 </form>
 
                 <div className="mt-8 text-center text-sm text-slate-500">

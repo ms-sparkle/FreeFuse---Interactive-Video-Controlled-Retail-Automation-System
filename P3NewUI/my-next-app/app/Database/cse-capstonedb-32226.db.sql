@@ -121,5 +121,15 @@ INSERT INTO "WORKOUT" ("WorkoutID","WorkoutName","BodyPartID","Duration","Reps")
  (4,'Dumbbell Curl',4,20,12),
  (5,'Overhead Press',5,25,10),
  (6,'Deadlift',6,50,5);
+CREATE TABLE IF NOT EXISTS "WORKOUT_SESSION" (
+    "SessionID"       INTEGER,
+    "SessionDate"     DATE DEFAULT CURRENT_DATE,
+    "AthletePersonID" INTEGER,
+    "WorkoutID"       INTEGER,
+    "Notes"           TEXT,
+    PRIMARY KEY("SessionID" AUTOINCREMENT),
+    FOREIGN KEY("AthletePersonID") REFERENCES "ATHLETE"("PersonID"),
+    FOREIGN KEY("WorkoutID") REFERENCES "WORKOUT"("WorkoutID")
+);
 INSERT INTO "WORKOUT_SESSION" ("SessionID","SessionDate","AthletePersonID","WorkoutID","Notes") VALUES (1,'2026-03-22',3,2,'Felt strong today.');
 COMMIT;
