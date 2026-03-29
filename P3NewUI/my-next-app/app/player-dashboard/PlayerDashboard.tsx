@@ -1,7 +1,7 @@
 "use client";
 import { Activity, CalendarDays, Dumbbell, ShieldCheck, Target, TrendingUp } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
+import { useState } from 'react';
 // placeholder for dynamic data pulling in
 // will need to splice data to most recent 7 days for the graph
 const data = [
@@ -60,10 +60,17 @@ export default function PlayerDashboard() {
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6 xl:col-span-1">
-            <h2 className="flex items-center gap-2 text-xl font-semibold text-cyan-300 mb-6">
-              <Activity size={18} />
-              Personal Information
-            </h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="flex items-center gap-2 text-xl font-semibold text-cyan-300 mb-6">
+                <Activity size={18} />
+                Personal Information
+              </h2>
+              <div>
+                  <button className="w-[12.5%] min-w-fit px-3 inline-flex items-center justify-center rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold py-1.5 transition-colors">
+                  Edit
+                </button>
+              </div>
+            </div>
 
             <div className="space-y-4 text-sm">
               <div className="flex justify-between"><span className="text-slate-400">Email</span><span>email@place.com</span></div>
@@ -74,8 +81,10 @@ export default function PlayerDashboard() {
               <hr className="border-slate-800" />
               <div className="flex justify-between"><span className="text-slate-400">BMI</span><span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700">22.9</span></div>
               <div className="flex justify-between"><span className="text-slate-400">Model Type</span><span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700">Standard</span></div>
+              <div className="flex justify-between"><span className="text-slate-400">Coaches</span><span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700">Jessica Smith</span></div>
             </div>
           </section>
+        
 
           <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6 xl:col-span-2">
             <h2 className="flex items-center gap-2 text-xl font-semibold text-cyan-300 mb-1">
