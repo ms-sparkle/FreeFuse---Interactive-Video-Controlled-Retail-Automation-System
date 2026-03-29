@@ -1,6 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
 
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const personId = Number(id);
+
+    if (isNaN(personId)) {
+      return NextResponse.json({ error: 'Invalid player id' }, { status: 400 });
+    }
+
+    const body = await req.json() as {
+      firstName: string;
+      lastName: string;
+      dateOfBirth: string;
+      sex: string;
+      height: number;
+      weight: number;
+      sportPlayed: string;
+      team: string;
+      hoursSpentWorkingOut: number;
+    };
+
+    const db = getDb();
+
+    db.prepare(`
+      UPDATE PERSON SET FirstName = ?, LastName = ?, DateOfBirth = ?
+      WHERE PersonID = ?
+    `).run(body.firstName, body.lastName, body.dateOfBirth, personId);
+
+    db.prepare(`
+      UPDATE ATHLETE SET Sex = ?, Height = ?, Weight = ?, SportPlayed = ?, Team = ?, HoursSpentWorkingOut = ?
+      WHERE PersonID = ?
+    `).run(body.sex, body.height, body.weight, body.sportPlayed, body.team, body.hoursSpentWorkingOut, personId);
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error('Player update error:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

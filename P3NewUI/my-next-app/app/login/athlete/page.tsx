@@ -35,6 +35,7 @@ export default function AthleteLogin() {
                 firstName: data.firstName,
                 lastName: data.lastName,
                 role: data.role,
+                sex: data.sex ?? null,
             }));
             router.push('/check-in');
         } catch {

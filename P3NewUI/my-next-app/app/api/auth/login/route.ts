@@ -31,9 +31,9 @@ export async function POST(req: NextRequest) {
 
     // Determine role
     const isCoach = db.prepare('SELECT 1 FROM COACH WHERE PersonID = ?').get(person.PersonID);
-    const isAthlete = db.prepare('SELECT 1 FROM ATHLETE WHERE PersonID = ?').get(person.PersonID);
+    const athlete = db.prepare('SELECT Sex FROM ATHLETE WHERE PersonID = ?').get(person.PersonID) as { Sex: string } | undefined;
 
-    const role = isCoach ? 'coach' : isAthlete ? 'athlete' : null;
+    const role = isCoach ? 'coach' : athlete ? 'athlete' : null;
 
     if (!role) {
       return NextResponse.json({ error: 'No role assigned' }, { status: 403 });
@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
       firstName: person.FirstName,
       lastName: person.LastName,
       role,
+      sex: athlete?.Sex ?? null,
     });
   } catch (err) {
     console.error('Login error:', err);

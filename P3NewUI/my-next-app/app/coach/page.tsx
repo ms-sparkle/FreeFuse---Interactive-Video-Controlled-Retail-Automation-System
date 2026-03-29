@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { User, AlertTriangle, CheckCircle, Activity, ArrowRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { User, AlertTriangle, CheckCircle, Activity, ArrowRight, LogOut } from 'lucide-react';
 
 type Athlete = {
   PersonID: number;
@@ -34,8 +35,14 @@ type PlayerDetail = {
 };
 
 export default function CoachDashboard() {
+  const router = useRouter();
   const [roster, setRoster] = useState<Athlete[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  const logout = () => {
+    localStorage.removeItem('session');
+    router.push('/login');
+  };
   const [detail, setDetail] = useState<PlayerDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [coachName, setCoachName] = useState('');
@@ -73,10 +80,20 @@ export default function CoachDashboard() {
 
         {/* Header */}
         <div className="p-6 border-b border-slate-800">
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <Activity className="text-cyan-400" />
-            Team Roster
-          </h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+              <Activity className="text-cyan-400" />
+              Team Roster
+            </h1>
+            <button
+              onClick={logout}
+              className="flex items-center gap-1.5 text-slate-500 hover:text-white transition-colors text-sm"
+              title="Logout"
+            >
+              <LogOut size={16} />
+              Logout
+            </button>
+          </div>
           <p className="text-slate-400 text-sm mt-1">{coachName || 'Coach Dashboard'}</p>
         </div>
 

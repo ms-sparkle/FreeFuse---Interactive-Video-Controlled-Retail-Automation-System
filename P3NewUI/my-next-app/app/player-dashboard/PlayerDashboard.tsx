@@ -1,7 +1,10 @@
 "use client";
 import { useEffect, useState } from 'react';
-import { Activity, CalendarDays, Dumbbell, ShieldCheck, Target, TrendingUp } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Activity, AlertTriangle, CalendarDays, Dumbbell, LogOut, Settings, ShieldCheck, Target, TrendingUp, User } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+
+type Tab = 'workout' | 'soreness' | 'profile';
 
 type PlayerData = {
   player: {
@@ -30,9 +33,81 @@ function calcAge(dob: string): number {
   return age;
 }
 
+type ProfileForm = {
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  sex: string;
+  height: number;
+  weight: number;
+  sportPlayed: string;
+  team: string;
+  hoursSpentWorkingOut: number;
+};
+
 export default function PlayerDashboard() {
+  const router = useRouter();
   const [data, setData] = useState<PlayerData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<Tab>('workout');
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [form, setForm] = useState<ProfileForm | null>(null);
+
+  const logout = () => {
+    localStorage.removeItem('session');
+    router.push('/login');
+  };
+
+  const startEditing = () => {
+    if (!data) return;
+    setForm({
+      firstName: data.player.FirstName,
+      lastName: data.player.LastName,
+      dateOfBirth: data.player.DateOfBirth,
+      sex: data.player.Sex,
+      height: data.player.Height,
+      weight: data.player.Weight,
+      sportPlayed: data.player.SportPlayed,
+      team: data.player.Team,
+      hoursSpentWorkingOut: data.player.HoursSpentWorkingOut,
+    });
+    setSaveError(null);
+    setEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setEditing(false);
+    setForm(null);
+    setSaveError(null);
+  };
+
+  const saveProfile = async () => {
+    if (!form) return;
+    const raw = localStorage.getItem('session');
+    if (!raw) return;
+    const session = JSON.parse(raw);
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const res = await fetch(`/api/player/${session.personId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      // Re-fetch fresh data
+      const updated = await fetch(`/api/player/${session.personId}`).then(r => r.json());
+      setData(updated);
+      setEditing(false);
+      setForm(null);
+    } catch {
+      setSaveError('Failed to save. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   useEffect(() => {
     const raw = localStorage.getItem('session');
@@ -64,146 +139,385 @@ export default function PlayerDashboard() {
   const { player, latestReport, sorenessEntries, workoutSuggestions, sessions } = data;
   const atRisk = (latestReport?.InjuryRiskScore ?? 0) > 0;
 
-  // Build chart data from sessions (most recent first → reverse for display)
   const chartData = [...sessions].reverse().map(s => ({
     day: s.SessionDate,
     workout: s.WorkoutName,
   }));
 
+  const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: 'workout', label: 'Workout', icon: <Dumbbell size={16} /> },
+    { id: 'soreness', label: 'Soreness', icon: <Activity size={16} /> },
+    { id: 'profile', label: 'Profile & Settings', icon: <User size={16} /> },
+  ];
+
   return (
-    <main className="min-h-screen bg-slate-950 text-white p-6 md:p-10">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
+    <main className="min-h-screen bg-slate-950 text-white flex flex-col">
+
+      {/* ── TOP BAR ── */}
+      <header className="sticky top-0 z-10 bg-slate-950/90 backdrop-blur border-b border-slate-800">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-cyan-400">
+            <h1 className="text-xl font-bold text-cyan-400">
               Welcome back, {player.FirstName}!
             </h1>
-            <p className="text-slate-400 mt-2">Here&apos;s your personalized fitness dashboard</p>
+            <p className="text-slate-400 text-xs mt-0.5">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+            </p>
           </div>
 
-          <div className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-slate-200">
-            <CalendarDays size={16} className="text-cyan-300" />
-            <span className="font-semibold">Today: {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+          <div className="flex items-center gap-3">
+            {/* Recovery status badge */}
+            <span className={`hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border
+              ${atRisk
+                ? 'bg-red-950/50 border-red-700 text-red-300'
+                : 'bg-emerald-950/50 border-emerald-700 text-emerald-300'}`}>
+              {atRisk ? <AlertTriangle size={12} /> : <ShieldCheck size={12} />}
+              {atRisk ? 'Injury Risk' : 'Cleared to Train'}
+            </span>
+
+            <button
+              onClick={logout}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 px-3 py-2 text-sm text-slate-400 hover:text-white transition-colors"
+            >
+              <LogOut size={15} />
+              Logout
+            </button>
           </div>
         </div>
 
-        {/* Recovery banner */}
-        <div className={`mb-6 rounded-xl border px-4 py-4 ${atRisk ? 'border-red-800/60 bg-red-950/30' : 'border-emerald-800/60 bg-emerald-950/30'}`}>
-          <div className={`flex items-center gap-2 font-semibold ${atRisk ? 'text-red-300' : 'text-emerald-300'}`}>
-            <ShieldCheck size={16} />
-            {atRisk ? 'Injury Risk Detected' : 'Good Recovery Status'}
-          </div>
-          <p className={`text-sm mt-1 ${atRisk ? 'text-red-200/90' : 'text-emerald-200/90'}`}>
-            {atRisk
-              ? 'Review your soreness below and follow the modified workout plan.'
-              : 'Your muscles are recovering well. You can proceed with normal training.'}
-          </p>
-        </div>
+        {/* ── TAB NAV ── */}
+        <nav className="max-w-7xl mx-auto px-6 flex gap-1 border-t border-slate-800/60">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors
+                ${activeTab === tab.id
+                  ? 'border-cyan-400 text-cyan-400'
+                  : 'border-transparent text-slate-400 hover:text-white hover:border-slate-600'}`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      </header>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* Personal Info */}
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6 xl:col-span-1">
-            <h2 className="flex items-center gap-2 text-xl font-semibold text-cyan-300 mb-6">
-              <Activity size={18} />
-              Personal Information
-            </h2>
+      {/* ── PAGE CONTENT ── */}
+      <div className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
 
-            <div className="space-y-4 text-sm">
-              <div className="flex justify-between"><span className="text-slate-400">Name</span><span>{player.FirstName} {player.LastName}</span></div>
-              <div className="flex justify-between"><span className="text-slate-400">Sex</span><span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700">{player.Sex}</span></div>
-              <div className="flex justify-between"><span className="text-slate-400">Age</span><span>{calcAge(player.DateOfBirth)} years</span></div>
-              <div className="flex justify-between"><span className="text-slate-400">Height</span><span>{player.Height}&quot;</span></div>
-              <div className="flex justify-between"><span className="text-slate-400">Weight</span><span>{player.Weight} lbs</span></div>
-              <hr className="border-slate-800" />
-              <div className="flex justify-between"><span className="text-slate-400">Sport</span><span>{player.SportPlayed}</span></div>
-              <div className="flex justify-between"><span className="text-slate-400">Team</span><span>{player.Team}</span></div>
-              <div className="flex justify-between"><span className="text-slate-400">Hrs / Week</span><span>{player.HoursSpentWorkingOut}</span></div>
+        {/* ══ WORKOUT TAB ══ */}
+        {activeTab === 'workout' && (
+          <div className="space-y-6">
+            {/* Injury risk banner */}
+            <div className={`rounded-xl border px-4 py-4 ${atRisk ? 'border-red-800/60 bg-red-950/30' : 'border-emerald-800/60 bg-emerald-950/30'}`}>
+              <div className={`flex items-center gap-2 font-semibold ${atRisk ? 'text-red-300' : 'text-emerald-300'}`}>
+                <ShieldCheck size={16} />
+                {atRisk ? 'Injury Risk Detected' : 'Good Recovery Status'}
+              </div>
+              <p className={`text-sm mt-1 ${atRisk ? 'text-red-200/90' : 'text-emerald-200/90'}`}>
+                {atRisk
+                  ? 'Review your soreness and follow the modified workout plan below.'
+                  : 'Your muscles are recovering well. You can proceed with normal training.'}
+              </p>
               {latestReport && (
-                <>
-                  <hr className="border-slate-800" />
-                  <div className="flex justify-between"><span className="text-slate-400">Progress Score</span><span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700">{latestReport.ProgressScore}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">Injury Risk</span><span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700">{latestReport.InjuryRiskScore}</span></div>
-                </>
+                <div className="flex gap-4 mt-3 text-xs">
+                  <span className="text-slate-400">Progress score: <span className="text-white font-semibold">{latestReport.ProgressScore}</span></span>
+                  <span className="text-slate-400">Injury risk: <span className={`font-semibold ${atRisk ? 'text-red-300' : 'text-emerald-300'}`}>{latestReport.InjuryRiskScore}</span></span>
+                  <span className="text-slate-400">Last check-in: <span className="text-white font-semibold">{latestReport.ReportDate}</span></span>
+                </div>
               )}
             </div>
-          </section>
 
-          {/* Workout Recommendations */}
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6 xl:col-span-2">
-            <h2 className="flex items-center gap-2 text-xl font-semibold text-cyan-300 mb-1">
-              <Dumbbell size={18} />
-              Workout Recommendations
-            </h2>
-            <p className="text-slate-400 mb-6">Based on your current muscle soreness levels</p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {workoutSuggestions.length === 0 ? (
-                <p className="text-slate-500 text-sm col-span-2">No recommendations yet. Complete a check-in first.</p>
-              ) : workoutSuggestions.map((item) => (
-                <div key={item.WorkoutName} className="rounded-xl border border-slate-800 bg-slate-950/40 p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold">{item.WorkoutName}</h3>
-                    <span className="px-2 py-0.5 rounded-full text-xs border bg-cyan-500/15 text-cyan-300 border-cyan-500/40">
-                      {item.BodyPartName}
-                    </span>
+            {/* Workout recommendations */}
+            <section>
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-4">
+                <Dumbbell size={18} />
+                Workout Recommendations
+                <span className="text-xs text-slate-500 font-normal ml-1">Based on your check-in</span>
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {workoutSuggestions.length === 0 ? (
+                  <p className="text-slate-500 text-sm col-span-3">No recommendations yet — complete a check-in first.</p>
+                ) : workoutSuggestions.map((item) => (
+                  <div key={item.WorkoutName} className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold">{item.WorkoutName}</h3>
+                      <span className="px-2 py-0.5 rounded-full text-xs border bg-cyan-500/15 text-cyan-300 border-cyan-500/40">
+                        {item.BodyPartName}
+                      </span>
+                    </div>
+                    <p className="text-slate-400 text-sm mb-4">{item.Reps} reps · {item.Duration} min</p>
+                    <button className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-semibold py-2.5 transition-colors">
+                      <Target size={16} />
+                      Start Workout
+                    </button>
                   </div>
+                ))}
+              </div>
+            </section>
 
-                  <p className="text-slate-300 mb-4">{item.Reps} reps · {item.Duration} min</p>
-
-                  <button className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-semibold py-2.5 transition-colors">
-                    <Target size={16} />
-                    Start Workout
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
-
-        {/* Recent Sessions Chart */}
-        {sessions.length > 0 && (
-          <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
-            <h2 className="flex items-center gap-2 text-xl font-semibold text-cyan-300 mb-1">
-              <TrendingUp size={18} />
-              Recent Sessions
-            </h2>
-            <p className="text-slate-400 mb-5">Your last {sessions.length} logged workouts</p>
-            <div className="h-[220px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                  <XAxis dataKey="day" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis hide />
-                  <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }} itemStyle={{ color: '#06b6d4' }} />
-                  <Line type="monotone" dataKey="day" stroke="#06b6d4" strokeWidth={3} dot={{ r: 4, fill: '#06b6d4' }} activeDot={{ r: 6, strokeWidth: 0 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </section>
+            {/* Recent sessions */}
+            <section>
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-4">
+                <TrendingUp size={18} />
+                Recent Sessions
+              </h2>
+              {sessions.length === 0 ? (
+                <p className="text-slate-500 text-sm">No sessions logged yet.</p>
+              ) : (
+                <>
+                  <div className="h-[220px] w-full min-w-0 rounded-xl border border-slate-800 bg-slate-900 p-4">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                      <LineChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                        <XAxis dataKey="day" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                        <YAxis hide />
+                        <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }} itemStyle={{ color: '#06b6d4' }} />
+                        <Line type="monotone" dataKey="day" stroke="#06b6d4" strokeWidth={3} dot={{ r: 4, fill: '#06b6d4' }} activeDot={{ r: 6, strokeWidth: 0 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {sessions.map((s, i) => (
+                      <div key={i} className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm">
+                        <span className="font-medium">{s.WorkoutName}</span>
+                        <div className="flex items-center gap-4">
+                          {s.Notes && <span className="text-slate-500 hidden md:block">{s.Notes}</span>}
+                          <span className="text-slate-400">{s.SessionDate}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </section>
+          </div>
         )}
 
-        {/* Current Soreness */}
-        <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
-          <h2 className="text-xl font-semibold text-cyan-300 mb-1">Current Muscle Soreness</h2>
-          <p className="text-slate-400 mb-5">From your most recent check-in</p>
-
-          {sorenessEntries.length === 0 ? (
-            <p className="text-slate-500 text-sm">No soreness recorded yet. Head to the check-in page to submit today&apos;s report.</p>
-          ) : (
-            <div className="space-y-2 max-w-sm">
-              {sorenessEntries.map((entry, i) => (
-                <div key={i} className="rounded-xl border border-slate-800 bg-slate-950/40 px-4 py-3 flex items-center justify-between">
-                  <span className="text-white">{entry.BodyPartName}{entry.Side !== 'N/A' ? ` (${entry.Side})` : ''}</span>
-                  <span className="px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-cyan-300 font-semibold text-sm">
-                    {entry.SorenessLevel}/10
-                  </span>
-                </div>
-              ))}
+        {/* ══ SORENESS TAB ══ */}
+        {activeTab === 'soreness' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-cyan-300">Current Muscle Soreness</h2>
+                <p className="text-slate-400 text-sm">From your most recent check-in{latestReport ? ` on ${latestReport.ReportDate}` : ''}</p>
+              </div>
+              <a href="/check-in" className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black text-sm font-semibold transition-colors">
+                Update Check-In
+              </a>
             </div>
-          )}
-        </section>
+
+            {sorenessEntries.length === 0 ? (
+              <div className="rounded-xl border border-slate-800 bg-slate-900 p-10 text-center">
+                <Activity className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+                <p className="text-slate-400 font-medium">No soreness recorded yet</p>
+                <p className="text-slate-500 text-sm mt-1">Complete a check-in to see your soreness data here.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {sorenessEntries.map((entry, i) => {
+                  const level = entry.SorenessLevel;
+                  const color = level >= 7 ? 'border-red-700 bg-red-950/30 text-red-300'
+                    : level >= 4 ? 'border-yellow-700 bg-yellow-950/30 text-yellow-300'
+                    : 'border-emerald-700 bg-emerald-950/30 text-emerald-300';
+                  const bar = level >= 7 ? 'bg-red-500' : level >= 4 ? 'bg-yellow-500' : 'bg-emerald-500';
+                  return (
+                    <div key={i} className={`rounded-xl border p-4 ${color}`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="font-semibold text-white">
+                          {entry.BodyPartName}{entry.Side !== 'N/A' ? ` (${entry.Side})` : ''}
+                        </span>
+                        <span className="text-lg font-bold">{level}<span className="text-sm font-normal text-slate-400">/10</span></span>
+                      </div>
+                      <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full transition-all ${bar}`} style={{ width: `${level * 10}%` }} />
+                      </div>
+                      <p className="text-xs mt-2 opacity-75">
+                        {level >= 7 ? 'High — avoid loading this area' : level >= 4 ? 'Moderate — train with caution' : 'Low — cleared for normal training'}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══ PROFILE & SETTINGS TAB ══ */}
+        {activeTab === 'profile' && (
+          <div className="space-y-6 max-w-2xl">
+            {/* Personal Info */}
+            <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300">
+                  <User size={18} />
+                  Personal Information
+                </h2>
+                {!editing ? (
+                  <button
+                    onClick={startEditing}
+                    className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors text-xs"
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={cancelEditing}
+                      className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-400 hover:text-white transition-colors text-xs"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveProfile}
+                      disabled={saving}
+                      className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black font-semibold transition-colors text-xs"
+                    >
+                      {saving ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {saveError && (
+                <p className="text-red-400 text-xs mb-4">{saveError}</p>
+              )}
+
+              {!editing ? (
+                <div className="grid grid-cols-2 gap-y-4 text-sm">
+                  <span className="text-slate-400">First Name</span><span>{player.FirstName}</span>
+                  <span className="text-slate-400">Last Name</span><span>{player.LastName}</span>
+                  <span className="text-slate-400">Date of Birth</span><span>{player.DateOfBirth}</span>
+                  <span className="text-slate-400">Sex</span><span>{player.Sex}</span>
+                  <span className="text-slate-400">Height</span><span>{player.Height}&quot;</span>
+                  <span className="text-slate-400">Weight</span><span>{player.Weight} lbs</span>
+                  <span className="text-slate-400">Sport</span><span>{player.SportPlayed}</span>
+                  <span className="text-slate-400">Team</span><span>{player.Team}</span>
+                  <span className="text-slate-400">Hrs / Week</span><span>{player.HoursSpentWorkingOut}</span>
+                </div>
+              ) : form && (
+                <div className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-400 text-xs">First Name</label>
+                    <input
+                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                      value={form.firstName}
+                      onChange={e => setForm({ ...form, firstName: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-400 text-xs">Last Name</label>
+                    <input
+                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                      value={form.lastName}
+                      onChange={e => setForm({ ...form, lastName: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-400 text-xs">Date of Birth</label>
+                    <input
+                      type="date"
+                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                      value={form.dateOfBirth}
+                      onChange={e => setForm({ ...form, dateOfBirth: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-400 text-xs">Sex</label>
+                    <select
+                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                      value={form.sex}
+                      onChange={e => setForm({ ...form, sex: e.target.value })}
+                    >
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-400 text-xs">Height (inches)</label>
+                    <input
+                      type="number"
+                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                      value={form.height}
+                      onChange={e => setForm({ ...form, height: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-400 text-xs">Weight (lbs)</label>
+                    <input
+                      type="number"
+                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                      value={form.weight}
+                      onChange={e => setForm({ ...form, weight: Number(e.target.value) })}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-400 text-xs">Sport</label>
+                    <input
+                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                      value={form.sportPlayed}
+                      onChange={e => setForm({ ...form, sportPlayed: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-slate-400 text-xs">Team</label>
+                    <input
+                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                      value={form.team}
+                      onChange={e => setForm({ ...form, team: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1 col-span-2">
+                    <label className="text-slate-400 text-xs">Hours Working Out / Week</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                      value={form.hoursSpentWorkingOut}
+                      onChange={e => setForm({ ...form, hoursSpentWorkingOut: Number(e.target.value) })}
+                    />
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {/* Settings */}
+            <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-5">
+                <Settings size={18} />
+                Settings
+              </h2>
+              <div className="space-y-4 text-sm">
+                <div className="flex items-center justify-between py-3 border-b border-slate-800">
+                  <div>
+                    <p className="font-medium">Account</p>
+                    <p className="text-slate-400 text-xs mt-0.5">Manage your login credentials</p>
+                  </div>
+                  <button className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors text-xs">
+                    Change Password
+                  </button>
+                </div>
+                <div className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="font-medium text-red-400">Sign Out</p>
+                    <p className="text-slate-400 text-xs mt-0.5">Log out of your account</p>
+                  </div>
+                  <button
+                    onClick={logout}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-red-800 text-red-400 hover:bg-red-950/50 transition-colors text-xs"
+                  >
+                    <LogOut size={13} />
+                    Logout
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+
       </div>
     </main>
   );
 }
-

@@ -35,6 +35,7 @@ export default function CoachLogin() {
                 firstName: data.firstName,
                 lastName: data.lastName,
                 role: data.role,
+                sex: data.sex ?? null,
             }));
             router.push('/coach');
         } catch {
