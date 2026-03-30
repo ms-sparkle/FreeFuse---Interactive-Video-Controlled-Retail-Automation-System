@@ -1,6 +1,7 @@
 ﻿"use client";
 import Link from 'next/link';
-import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
 import { bodyFemaleFront } from '../assets/bodyFemaleFront';
 import { bodyFemaleBack } from '../assets/bodyFemaleBack';
 import { bodyFront } from '../assets/bodyFront';
@@ -46,12 +47,24 @@ const getMuscleName = (slug: string): string => {
 };
 
 export default function BodyMap() {
+  const router = useRouter();
   const [sorenessData, setSorenessData] = useState<SorenessRecord>({});
   const [activeMuscle, setActiveMuscle] = useState<string | null>(null);
   const [hoveredMuscle, setHoveredMuscle] = useState<string | null>(null);
   const [currentLevel, setCurrentLevel] = useState(5);
-  const [bodyVariant, setBodyVariant] = useState<'female' | 'male'>('female');
+  const [bodyVariant, setBodyVariant] = useState<'female' | 'male'>('male');
+
+  useEffect(() => {
+    const raw = localStorage.getItem('session');
+    if (!raw) return;
+    const session = JSON.parse(raw);
+    if (session.sex) {
+      setBodyVariant(session.sex.toLowerCase() === 'male' ? 'male' : 'female');
+    }
+  }, []);
   const [bodySide, setBodySide] = useState<'front' | 'back'>('front');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const bodyData = bodySide === 'front'
     ? (bodyVariant === 'female' ? bodyFemaleFront : bodyFront)
@@ -66,6 +79,54 @@ export default function BodyMap() {
         [activeMuscle]: currentLevel
       }));
       setActiveMuscle(null);
+    }
+  };
+
+  const submitCheckIn = async () => {
+    const raw = localStorage.getItem('session');
+    if (!raw) { setSubmitError('Not logged in'); return; }
+    const session = JSON.parse(raw);
+    setSubmitting(true);
+    setSubmitError('');
+
+    // Build complete soreness map: all muscle slugs defaulting to 0
+    const allBodyData = [bodyFront, bodyBack, bodyFemaleFront, bodyFemaleBack];
+    const completeSorenessData: SorenessRecord = {};
+    for (const dataset of allBodyData) {
+      for (const muscle of dataset) {
+        if (muscle.slug === 'hair' || muscle.slug === 'head') continue;
+        if (muscle.path.common?.length) {
+          if (!(muscle.slug in completeSorenessData)) completeSorenessData[muscle.slug] = 0;
+        }
+        if (muscle.path.left?.length) {
+          const key = `${muscle.slug}_left`;
+          if (!(key in completeSorenessData)) completeSorenessData[key] = 0;
+        }
+        if (muscle.path.right?.length) {
+          const key = `${muscle.slug}_right`;
+          if (!(key in completeSorenessData)) completeSorenessData[key] = 0;
+        }
+      }
+    }
+    // Overlay user-entered values
+    const finalSorenessData = { ...completeSorenessData, ...sorenessData };
+
+    try {
+      const res = await fetch('/api/check-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ athletePersonId: session.personId, sorenessData: finalSorenessData }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        setSubmitError(d.error ?? 'Submission failed');
+        return;
+      }
+      router.push('/player-dashboard');
+    } catch {
+      setSubmitError('Network error – please try again');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -100,15 +161,9 @@ export default function BodyMap() {
             onClick={() => setBodySide(prev => (prev === 'front' ? 'back' : 'front'))}
             className="px-3 py-1 text-xs uppercase tracking-widest bg-slate-800 text-slate-200 hover:bg-slate-700 rounded-full border border-slate-700"
           >
-            {bodySide === 'front' ? 'Front' : 'Back'}
+            {bodySide === 'front' ? 'Switch to Back View' : 'Switch to Front View'}
           </button>
-          <button
-            type="button"
-            onClick={() => setBodyVariant(prev => (prev === 'female' ? 'male' : 'female'))}
-            className="px-3 py-1 text-xs uppercase tracking-widest bg-slate-800 text-slate-200 hover:bg-slate-700 rounded-full border border-slate-700"
-          >
-            {bodyVariant === 'female' ? 'Female' : 'Male'}
-          </button>
+
         </div>
         <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10 px-3 py-1 text-xs uppercase tracking-widest bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded-full">
           {bodySide === 'front' ? 'Front View' : 'Back View'}
@@ -292,10 +347,21 @@ export default function BodyMap() {
 
       <Link
         href="/player-dashboard"
-        className="absolute bottom-6 right-6 px-5 py-3 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded-lg transition-colors shadow-lg"
+        className="absolute bottom-6 left-6 px-5 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-lg transition-colors shadow-lg"
       >
-        Continue to Dashboard
+        Skip
       </Link>
+
+      <div className="absolute bottom-6 right-6 flex flex-col items-end gap-2">
+        {submitError && <p className="text-red-400 text-sm">{submitError}</p>}
+        <button
+          onClick={submitCheckIn}
+          disabled={submitting}
+          className="px-5 py-3 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black font-bold rounded-lg transition-colors shadow-lg"
+        >
+          {submitting ? 'Submitting…' : 'Submit Check-In'}
+        </button>
+      </div>
 
     </div>
   );
