@@ -1,7 +1,16 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, AlertTriangle, CheckCircle, Activity, ArrowRight, LogOut } from 'lucide-react';
+import { User, 
+  AlertTriangle, 
+  CheckCircle, 
+  Activity, 
+  ArrowRight, 
+  LogOut, 
+  Settings, 
+  Plus, 
+  UserMinus, 
+  ChevronLeft } from 'lucide-react';
 
 type Athlete = {
   PersonID: number;
@@ -38,6 +47,7 @@ export default function CoachDashboard() {
   const router = useRouter();
   const [roster, setRoster] = useState<Athlete[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [isManagingRoster, setIsManagingRoster] = useState(false);
 
   const logout = () => {
     localStorage.removeItem('session');
@@ -133,6 +143,18 @@ export default function CoachDashboard() {
               </div>
             );
           })}
+        </div>
+      {/* </div> */}
+
+      {/* --- NEW: MANAGE ROSTER BUTTON --- */}
+        <div className="p-4 border-t border-slate-800 bg-slate-900/80">
+            <button 
+                onClick={() => setIsManagingRoster(true)}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-slate-800 border border-slate-700 hover:bg-cyan-600 hover:border-cyan-500 hover:text-black transition-all font-semibold"
+            >
+                <Settings size={18} />
+                Manage Team Roster
+            </button>
         </div>
       </div>
 
