@@ -1,5 +1,4 @@
 ﻿"use client";
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import { bodyFemaleFront } from '../assets/bodyFemaleFront';
@@ -344,13 +343,6 @@ export default function BodyMap() {
           </div>
         )}
       </div>
-
-      <Link
-        href="/player-dashboard"
-        className="absolute bottom-6 left-6 px-5 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-lg transition-colors shadow-lg"
-      >
-        Skip
-      </Link>
 
       <div className="absolute bottom-6 right-6 flex flex-col items-end gap-2">
         {submitError && <p className="text-red-400 text-sm">{submitError}</p>}
