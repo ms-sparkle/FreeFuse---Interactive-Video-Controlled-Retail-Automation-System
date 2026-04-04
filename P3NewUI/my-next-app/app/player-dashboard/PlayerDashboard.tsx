@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, AlertTriangle, CalendarDays, Dumbbell, LogOut, Settings, ShieldCheck, Target, TrendingUp, User } from 'lucide-react';
+import { Activity, AlertTriangle, CalendarDays, Dumbbell, LogOut, Settings, ShieldCheck, Target, TrendingUp, User, CheckCircle2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 type Tab = 'workout' | 'soreness' | 'profile';
@@ -19,10 +19,18 @@ type PlayerData = {
     Weight: number;
     HoursSpentWorkingOut: number;
   };
+  coaches: Coach[];
   latestReport: { ProgressScore: number; InjuryRiskScore: number; ReportDate: string } | null;
   sorenessEntries: { BodyPartName: string; Side: string; SorenessLevel: number }[];
   workoutSuggestions: { WorkoutName: string; Duration: number; Reps: number; BodyPartName: string }[];
   sessions: { SessionDate: string; WorkoutName: string; Notes: string }[];
+};
+
+type Coach = {
+  PersonID: number;
+  FirstName: string;
+  LastName: string;
+  Email: string;
 };
 
 function calcAge(dob: string): number {
@@ -45,6 +53,7 @@ type ProfileForm = {
   hoursSpentWorkingOut: number;
 };
 
+
 export default function PlayerDashboard() {
   const router = useRouter();
   const [data, setData] = useState<PlayerData | null>(null);
@@ -54,6 +63,36 @@ export default function PlayerDashboard() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [form, setForm] = useState<ProfileForm | null>(null);
+  const [inviteCoachValue, setInviteCoachValue] = useState('');
+  const [showInviteSuccess, setShowInviteSuccess] = useState(false);
+
+  const handleInviteCoachUI = () => {
+      if (!inviteCoachValue) return;
+
+      // 1. Clear the text field
+      setInviteCoachValue('');
+
+      // 2. Show the confirmation message
+      setShowInviteSuccess(true);
+
+      // 3. Hide the message after 3 seconds
+      setTimeout(() => {
+        setShowInviteSuccess(false);
+      }, 3000);
+  };
+
+  const handleRemoveCoach = async (coachId: number) => {
+    if (!confirm("Remove this coach from your roster?")) return;
+    try {
+      await fetch(`/api/player/remove-coach/${coachId}`, { method: 'DELETE' });
+      setData(prev => prev ? {
+        ...prev,
+        coaches: prev.coaches.filter(c => c.PersonID !== coachId)
+      } : null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const logout = () => {
     localStorage.removeItem('session');
@@ -482,6 +521,77 @@ export default function PlayerDashboard() {
                 </div>
               )}
             </section>
+            {/* ══ COACH MANAGEMENT ══ */}
+            <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300">
+                  <ShieldCheck size={18} />
+                  My Coaches
+                </h2>
+              </div>
+
+            {/* ── INVITE BOX (UI ONLY) ── */}
+              <div className="mb-6 p-4 rounded-xl bg-slate-950/50 border border-slate-800">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
+                  Invite New Coach
+                </label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="Coach username or email..." 
+                    value={inviteCoachValue}
+                    onChange={(e) => setInviteCoachValue(e.target.value)}
+                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500 text-white"
+                  />
+                  <button 
+                    onClick={handleInviteCoachUI}
+                    disabled={!inviteCoachValue}
+                    className="bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-black px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
+                  >
+                    Invite
+                  </button>
+                </div>
+
+                {/* Confirmation Message */}
+                {showInviteSuccess && (
+                  <div className="mt-3 flex items-center gap-2 text-emerald-400 text-sm font-medium animate-in fade-in slide-in-from-top-1">
+                    <CheckCircle2 size={14} />
+                    Coach invited!
+                  </div>
+                )}
+              </div>
+
+            {/* Coaches List */}
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block px-1">
+                Active Coaches
+              </label>
+              {data.coaches?.length === 0 ? (
+                <p className="text-slate-500 text-sm italic px-1">No coaches assigned to your profile.</p>
+              ) : (
+                data.coaches?.map(coach => (
+                  <div key={coach.PersonID} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/40 border border-slate-800 group hover:border-slate-700 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-xs">
+                        {coach.FirstName[0]}{coach.LastName[0]}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-white">{coach.FirstName} {coach.LastName}</p>
+                        <p className="text-[10px] text-slate-500">{coach.Email}</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => handleRemoveCoach(coach.PersonID)}
+                      className="text-slate-500 hover:text-red-400 p-2 rounded-lg hover:bg-red-400/10 transition-all"
+                      title="Remove Coach"
+                    >
+                      <LogOut size={16} className="rotate-180" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
 
             {/* Settings */}
             <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
