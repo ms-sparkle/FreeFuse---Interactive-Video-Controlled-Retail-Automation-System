@@ -127,8 +127,8 @@ export default function CoachDashboard() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [isManagingRoster, setIsManagingRoster] = useState(false);
 
-  const logout = () => {
-    localStorage.removeItem('session');
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
   };
   const [detail, setDetail] = useState<PlayerDetail | null>(null);
@@ -137,15 +137,17 @@ export default function CoachDashboard() {
 
   // Load roster on mount using session coachId
   useEffect(() => {
-    const raw = localStorage.getItem('session');
-    if (!raw) return;
-    const session = JSON.parse(raw);
-    setCoachName(`${session.firstName} ${session.lastName}`);
-    fetch(`/api/coach/athletes?coachId=${session.personId}`)
-      .then(r => r.json())
-      .then(data => setRoster(data.athletes ?? []))
-      .catch(console.error);
-  }, []);
+    fetch('/api/auth/session')
+      .then(r => r.ok ? r.json() : null)
+      .then(session => {
+        if (!session) { router.push('/login'); return; }
+        setCoachName(`${session.firstName} ${session.lastName}`);
+        return fetch(`/api/coach/athletes?coachId=${session.personId}`)
+          .then(r => r.json())
+          .then(data => setRoster(data.athletes ?? []))
+          .catch(console.error);
+      });
+  }, [router]);
 
   // Load individual athlete detail when selected
   useEffect(() => {

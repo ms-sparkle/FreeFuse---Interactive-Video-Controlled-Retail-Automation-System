@@ -94,8 +94,8 @@ export default function PlayerDashboard() {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('session');
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
   };
 
@@ -124,9 +124,9 @@ export default function PlayerDashboard() {
 
   const saveProfile = async () => {
     if (!form) return;
-    const raw = localStorage.getItem('session');
-    if (!raw) return;
-    const session = JSON.parse(raw);
+    const sessionRes = await fetch('/api/auth/session');
+    if (!sessionRes.ok) { router.push('/login'); return; }
+    const session = await sessionRes.json();
     setSaving(true);
     setSaveError(null);
     try {
@@ -149,15 +149,17 @@ export default function PlayerDashboard() {
   };
 
   useEffect(() => {
-    const raw = localStorage.getItem('session');
-    if (!raw) return;
-    const session = JSON.parse(raw);
-    fetch(`/api/player/${session.personId}`)
-      .then(r => r.json())
-      .then(setData)
-      .catch(console.error)
+    fetch('/api/auth/session')
+      .then(r => r.ok ? r.json() : null)
+      .then(session => {
+        if (!session) { router.push('/login'); return; }
+        return fetch(`/api/player/${session.personId}`)
+          .then(r => r.json())
+          .then(setData)
+          .catch(console.error);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [router]);
 
   if (loading) {
     return (

@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { SignJWT } from 'jose';
+import bcrypt from 'bcryptjs';
 import getDb from '@/lib/db';
+
+const secret = new TextEncoder().encode(process.env.SESSION_SECRET ?? '');
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,16 +15,19 @@ export async function POST(req: NextRequest) {
 
     const db = getDb();
 
-    // Validate credentials (passwords stored as plain text in seed data)
     const account = db.prepare(
-      'SELECT AccountID FROM ACCOUNT WHERE Username = ? AND PasswordHash = ?'
-    ).get(username, password) as { AccountID: number } | undefined;
+      'SELECT AccountID, PasswordHash FROM ACCOUNT WHERE Username = ?'
+    ).get(username) as { AccountID: number; PasswordHash: string } | undefined;
 
     if (!account) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // Get person details
+    const passwordMatch = await bcrypt.compare(password, account.PasswordHash);
+    if (!passwordMatch) {
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    }
+
     const person = db.prepare(
       'SELECT PersonID, FirstName, LastName FROM PERSON WHERE AccountID = ?'
     ).get(account.AccountID) as { PersonID: number; FirstName: string; LastName: string } | undefined;
@@ -29,7 +36,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Person record not found' }, { status: 404 });
     }
 
-    // Determine role
     const isCoach = db.prepare('SELECT 1 FROM COACH WHERE PersonID = ?').get(person.PersonID);
     const athlete = db.prepare('SELECT Sex FROM ATHLETE WHERE PersonID = ?').get(person.PersonID) as { Sex: string } | undefined;
 
@@ -39,13 +45,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No role assigned' }, { status: 403 });
     }
 
-    return NextResponse.json({
+    const payload = {
       personId: person.PersonID,
       firstName: person.FirstName,
       lastName: person.LastName,
       role,
       sex: athlete?.Sex ?? null,
+    };
+
+    const token = await new SignJWT(payload)
+      .setProtectedHeader({ alg: 'HS256' })
+      .setExpirationTime('8h')
+      .sign(secret);
+
+    const response = NextResponse.json({ ok: true, role });
+    response.cookies.set('session', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 8,
+      path: '/',
     });
+    return response;
   } catch (err) {
     console.error('Login error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
