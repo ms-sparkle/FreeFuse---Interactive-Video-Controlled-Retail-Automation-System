@@ -43,6 +43,84 @@ type PlayerDetail = {
   workoutSuggestions: { WorkoutName: string; Duration: number; Reps: number; BodyPartName: string }[];
 };
 
+/* --- MODAL COMPONENT --- */
+const ManageRosterModal = ({ 
+  isOpen, 
+  onClose, 
+  athletes, 
+  onRemove, 
+  onInvite 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  athletes: Athlete[]; 
+  onRemove: (id: number) => void;
+  onInvite: (emailOrUser: string) => void;
+}) => {
+  const [inviteValue, setInviteValue] = useState('');
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
+        
+        {/* Header */}
+        <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Settings className="text-cyan-400" size={20} />
+            Manage Roster
+          </h2>
+          <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
+            <ChevronLeft size={24} />
+          </button>
+        </div>
+
+        {/* Invite Section */}
+        <div className="p-6 border-b border-slate-800 bg-slate-950/50">
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
+            Invite New Athlete
+          </label>
+          <div className="flex gap-2">
+            <input 
+              type="text" 
+              placeholder="Username or Email..." 
+              value={inviteValue}
+              onChange={(e) => setInviteValue(e.target.value)}
+              className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-cyan-500"
+            />
+            <button 
+              onClick={() => { onInvite(inviteValue); setInviteValue(''); }}
+              className="bg-cyan-600 hover:bg-cyan-500 text-black p-2 rounded-lg transition-colors"
+            >
+              <Plus size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Athlete List */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest px-2 mb-2 block">
+            Current Athletes ({athletes.length})
+          </label>
+          {athletes.map(athlete => (
+            <div key={athlete.PersonID} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-slate-800 group hover:border-red-500/50 transition-colors">
+              <span className="text-sm font-medium">{athlete.FirstName} {athlete.LastName}</span>
+              <button 
+                onClick={() => onRemove(athlete.PersonID)}
+                className="text-slate-500 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-500/10 transition-all"
+                title="Remove from roster"
+              >
+                <UserMinus size={18} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function CoachDashboard() {
   const router = useRouter();
   const [roster, setRoster] = useState<Athlete[]>([]);
@@ -81,6 +159,33 @@ export default function CoachDashboard() {
   }, [selectedId]);
 
   const activeAthlete = roster.find(a => a.PersonID === selectedId);
+
+  const handleRemoveAthlete = async (athleteId: number) => {
+    if (!confirm("Are you sure you want to remove this athlete?")) return;
+    
+    // Example API Call
+    try {
+      const response = await fetch(`/api/coach/remove-athlete`, {
+        method: 'POST',
+        body: JSON.stringify({ athleteId }),
+      });
+      if (response.ok) {
+        setRoster(prev => prev.filter(a => a.PersonID !== athleteId));
+      }
+    } catch (err) {
+      console.error("Failed to remove athlete", err);
+    }
+  };
+
+  const handleInviteAthlete = async (identifier: string) => {
+    if (!identifier) return;
+    
+    // Example API Call
+    console.log("Inviting:", identifier);
+    alert(`Invitation sent to ${identifier}!`);
+    // In a real app, you'd fetch the updated roster or show a success toast
+  };
+
 
   return (
     <main className="min-h-screen bg-slate-950 text-white flex overflow-hidden">
@@ -144,7 +249,6 @@ export default function CoachDashboard() {
             );
           })}
         </div>
-      {/* </div> */}
 
       {/* --- NEW: MANAGE ROSTER BUTTON --- */}
         <div className="p-4 border-t border-slate-800 bg-slate-900/80">
@@ -157,6 +261,14 @@ export default function CoachDashboard() {
             </button>
         </div>
       </div>
+
+      <ManageRosterModal 
+        isOpen={isManagingRoster}
+        onClose={() => setIsManagingRoster(false)}
+        athletes={roster}
+        onRemove={handleRemoveAthlete}
+        onInvite={handleInviteAthlete}
+      />
 
       {/* --- RIGHT PANEL: COMMAND CENTER --- */}
       <div className="w-2/3 bg-slate-950 p-10 flex flex-col h-screen overflow-y-auto">
