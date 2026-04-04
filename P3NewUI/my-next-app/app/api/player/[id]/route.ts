@@ -164,8 +164,27 @@ export async function GET(
       Notes: string;
     }[];
 
+    // Fetch coaches linked to this athlete
+    const coaches = db.prepare(`
+      SELECT 
+        p.PersonID, 
+        p.FirstName, 
+        p.LastName, 
+        acc.Username AS Email
+      FROM ATHLETE_COACH ac
+      JOIN PERSON p ON ac.CoachPersonID = p.PersonID
+      JOIN ACCOUNT acc ON p.AccountID = acc.AccountID
+      WHERE ac.AthletePersonID = ?
+    `).all(personId) as {
+      PersonID: number;
+      FirstName: string;
+      LastName: string;
+      Email: string;
+    }[];
+
     return NextResponse.json({
       player,
+      coaches,
       latestReport: latestReport ?? null,
       sorenessEntries,
       workoutSuggestions,
