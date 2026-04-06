@@ -1,38 +1,90 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
 
-// POST /api/workout-session
-// Body: { athletePersonId: number, workoutName: string, notes?: string }
+// ==========================
+// CREATE WORKOUT SESSION
+// ==========================
 export async function POST(req: NextRequest) {
-  try {
-    const { athletePersonId, workoutName, notes } = await req.json() as {
-      athletePersonId: number;
-      workoutName: string;
-      notes?: string;
-    };
+    try {
+        const body = await req.json();
 
-    if (!athletePersonId || !workoutName) {
-      return NextResponse.json({ error: 'athletePersonId and workoutName required' }, { status: 400 });
+        const { athleteId, workoutId, notes } = body as {
+            athleteId?: number;
+            workoutId?: number;
+            notes?: string;
+        };
+
+        if (!athleteId || !workoutId) {
+            return NextResponse.json(
+                { error: 'athleteId and workoutId required' },
+                { status: 400 }
+            );
+        }
+
+        const db = getDb();
+
+        const result = db
+            .prepare(`
+                INSERT INTO WORKOUT_SESSION 
+                (AthletePersonID, WorkoutID, Notes) 
+                VALUES (?, ?, ?)
+            `)
+            .run(Number(athleteId), Number(workoutId), notes ?? null);
+
+        return NextResponse.json({
+            success: true,
+            sessionId: result.lastInsertRowid
+        });
+
+    } catch (err) {
+        console.error('Workout session error:', err);
+
+        return NextResponse.json(
+            { error: 'Internal server error' },
+            { status: 500 }
+        );
     }
+}
 
-    const db = getDb();
+// ==========================
+// GET WORKOUT SESSIONS
+// ==========================
+export async function GET(req: NextRequest) {
+    try {
+        const { searchParams } = new URL(req.url);
+        const athleteId = Number(searchParams.get('athleteId'));
 
-    const workout = db.prepare('SELECT WorkoutID FROM WORKOUT WHERE WorkoutName = ?').get(workoutName) as
-      | { WorkoutID: number }
-      | undefined;
+        if (!athleteId) {
+            return NextResponse.json(
+                { error: 'athleteId required' },
+                { status: 400 }
+            );
+        }
 
-    if (!workout) {
-      return NextResponse.json({ error: 'Workout not found' }, { status: 404 });
+        const db = getDb();
+
+        const sessions = db
+            .prepare(`
+                SELECT 
+                    ws.SessionID,
+                    ws.SessionDate,
+                    w.WorkoutName,
+                    ws.Notes
+                FROM WORKOUT_SESSION ws
+                JOIN WORKOUT w ON w.WorkoutID = ws.WorkoutID
+                WHERE ws.AthletePersonID = ?
+                ORDER BY ws.SessionDate DESC
+            `)
+            .all(athleteId);
+
+        return NextResponse.json({ sessions });
+
+    } catch (err) {
+        console.error('Fetch sessions error:', err);
+
+        return NextResponse.json(
+            { error: 'Internal server error' },
+            { status: 500 }
+        );
     }
-
-    const result = db.prepare(`
-      INSERT INTO WORKOUT_SESSION (SessionDate, AthletePersonID, WorkoutID, Notes)
-      VALUES (date('now'), ?, ?, ?)
-    `).run(athletePersonId, workout.WorkoutID, notes ?? null);
-
-    return NextResponse.json({ ok: true, sessionId: result.lastInsertRowid });
-  } catch (err) {
-    console.error('Workout session error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
 }
