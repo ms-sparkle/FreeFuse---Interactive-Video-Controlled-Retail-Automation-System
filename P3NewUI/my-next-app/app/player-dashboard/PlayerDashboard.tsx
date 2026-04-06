@@ -1,13 +1,26 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, AlertTriangle, CalendarDays, Dumbbell, LogOut, Settings, ShieldCheck, Target, TrendingUp, User, CheckCircle2 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import BodyMapDisplay from '../components/BodyMapDisplay';
+import {
+  Activity, AlertTriangle, CalendarDays, Dumbbell, LogOut,
+  Settings, ShieldCheck, Target, TrendingUp, User, CheckCircle2
+} from 'lucide-react';
+import {
+  LineChart, Line, XAxis, YAxis,
+  CartesianGrid, Tooltip, ResponsiveContainer, Legend
+} from 'recharts';
 
+import BodyMapDisplay from '../components/BodyMapDisplay';
+import SearchBar from '../components/SearchBar'; 
+
+// ================= TYPES =================
 type Tab = 'workout' | 'soreness' | 'history' | 'profile';
 
-type SessionHistoryRow = { SessionDate: string; WorkoutName: string; Notes: string };
+type Exercise = { 
+  ExerciseID: number;
+  Name: string;
+  TargetMuscle: string;
+};
 
 type PlayerData = {
   player: {
@@ -22,969 +35,259 @@ type PlayerData = {
     Weight: number;
     HoursSpentWorkingOut: number;
   };
-  coaches: Coach[];
-  latestReport: { ProgressScore: number; InjuryRiskScore: number; ReportDate: string } | null;
-  sorenessEntries: { BodyPartName: string; Side: string; SorenessLevel: number }[];
-  workoutSuggestions: { WorkoutName: string; Duration: number; Reps: number; BodyPartName: string }[];
-  sessions: { SessionDate: string; WorkoutName: string; Notes: string }[];
+  latestReport: {
+    ProgressScore: number;
+    InjuryRiskScore: number;
+    ReportDate: string;
+  } | null;
+  sorenessEntries: {
+    BodyPartName: string;
+    Side: string;
+    SorenessLevel: number;
+  }[];
+  workoutSuggestions: {
+    WorkoutName: string;
+    Duration: number;
+    Reps: number;
+    BodyPartName: string;
+  }[];
+  sessions: {
+    SessionDate: string;
+    WorkoutName: string;
+    Notes: string;
+  }[];
 };
-
-type Coach = {
-  PersonID: number;
-  FirstName: string;
-  LastName: string;
-  Email: string;
-};
-
-type SorenessHistoryRow = {
-  ReportDate: string;
-  BodyPartName: string;
-  Side: string;
-  SorenessLevel: number;
-};
-
-function calcAge(dob: string): number {
-  const birth = new Date(dob);
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  if (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate())) age--;
-  return age;
-}
-
-type ProfileForm = {
-  firstName: string;
-  lastName: string;
-  dateOfBirth: string;
-  sex: string;
-  height: number;
-  weight: number;
-  sportPlayed: string;
-  team: string;
-  hoursSpentWorkingOut: number;
-};
-
 
 export default function PlayerDashboard() {
   const router = useRouter();
+
   const [data, setData] = useState<PlayerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('workout');
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [form, setForm] = useState<ProfileForm | null>(null);
-  const [inviteCoachValue, setInviteCoachValue] = useState('');
-  const [showInviteSuccess, setShowInviteSuccess] = useState(false);
-  const [sorenessHistory, setSorenessHistory] = useState<SorenessHistoryRow[]>([]);
-  const [sorenessSubTab, setSorenessSubTab] = useState<'current' | 'history'>('current');
-  const [sessionHistory, setSessionHistory] = useState<SessionHistoryRow[]>([]);
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
-  const [calendarOffset, setCalendarOffset] = useState(0); // months back from today
 
-  const handleInviteCoachUI = () => {
-      if (!inviteCoachValue) return;
+  // WORKOUT LOGGER STATE
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [notes, setNotes] = useState('');
+  const [workoutId, setWorkoutId] = useState<number | null>(null);
 
-      // 1. Clear the text field
-      setInviteCoachValue('');
-
-      // 2. Show the confirmation message
-      setShowInviteSuccess(true);
-
-      // 3. Hide the message after 3 seconds
-      setTimeout(() => {
-        setShowInviteSuccess(false);
-      }, 3000);
-  };
-
-  const handleRemoveCoach = async (coachId: number) => {
-    if (!confirm("Remove this coach from your roster?")) return;
-    try {
-      await fetch(`/api/player/remove-coach/${coachId}`, { method: 'DELETE' });
-      setData(prev => prev ? {
-        ...prev,
-        coaches: prev.coaches.filter(c => c.PersonID !== coachId)
-      } : null);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
+  // ================= LOGOUT =================
   const logout = () => {
     localStorage.removeItem('session');
     router.push('/login');
   };
 
-  const startEditing = () => {
-    if (!data) return;
-    setForm({
-      firstName: data.player.FirstName,
-      lastName: data.player.LastName,
-      dateOfBirth: data.player.DateOfBirth,
-      sex: data.player.Sex,
-      height: data.player.Height,
-      weight: data.player.Weight,
-      sportPlayed: data.player.SportPlayed,
-      team: data.player.Team,
-      hoursSpentWorkingOut: data.player.HoursSpentWorkingOut,
-    });
-    setSaveError(null);
-    setEditing(true);
-  };
-
-  const cancelEditing = () => {
-    setEditing(false);
-    setForm(null);
-    setSaveError(null);
-  };
-
-  const saveProfile = async () => {
-    if (!form) return;
-    const raw = localStorage.getItem('session');
-    if (!raw) return;
-    const session = JSON.parse(raw);
-    setSaving(true);
-    setSaveError(null);
-    try {
-      const res = await fetch(`/api/player/${session.personId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) throw new Error('Save failed');
-      // Re-fetch fresh data
-      const updated = await fetch(`/api/player/${session.personId}`).then(r => r.json());
-      setData(updated);
-      setEditing(false);
-      setForm(null);
-    } catch {
-      setSaveError('Failed to save. Please try again.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
+  // ================= LOAD DATA =================
   useEffect(() => {
     const raw = localStorage.getItem('session');
     if (!raw) return;
+
     const session = JSON.parse(raw);
+
+    // Player data
     fetch(`/api/player/${session.personId}`)
       .then(r => r.json())
       .then(setData)
-      .catch(console.error)
       .finally(() => setLoading(false));
 
-    fetch(`/api/player/${session.personId}/soreness-history`)
+    //  LOAD EXERCISES
+    fetch('/api/exercises')
       .then(r => r.json())
-      .then(d => setSorenessHistory(d.history ?? []))
+      .then(d => {
+        setExercises(d.exercises ?? []);
+        if (d.exercises?.length > 0) {
+          setWorkoutId(d.exercises[0].ExerciseID);
+        }
+      })
       .catch(console.error);
 
-    fetch(`/api/player/${session.personId}/session-history`)
-      .then(r => r.json())
-      .then(d => setSessionHistory(d.sessions ?? []))
-      .catch(console.error);
   }, []);
 
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
-        Loading…
-      </main>
-    );
-  }
+  // ================= LOG WORKOUT =================
+  const logWorkout = async () => {
+    try {
+      const raw = localStorage.getItem('session');
+      if (!raw || !workoutId) return;
 
-  if (!data) {
-    return (
-      <main className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400">
-        Unable to load player data. Please log in again.
-      </main>
-    );
-  }
+      const session = JSON.parse(raw);
 
-  const { player, latestReport, sorenessEntries, workoutSuggestions, sessions } = data;
+      const res = await fetch('/api/workout-session', {
+        method: 'POST',
+        body: JSON.stringify({
+          athleteId: session.personId,
+          workoutId,
+          notes
+        }),
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!res.ok) throw new Error();
+
+      setNotes('');
+      alert('Workout logged!');
+
+      // refresh dashboard
+      const updated = await fetch(`/api/player/${session.personId}`).then(r => r.json());
+      setData(updated);
+
+    } catch {
+      alert('Failed to log workout.');
+    }
+  };
+
+  if (loading) return <div className="text-white p-10">Loading...</div>;
+  if (!data) return <div className="text-white p-10">No data</div>;
+
+  const { player, latestReport, workoutSuggestions, sessions } = data;
   const atRisk = (latestReport?.InjuryRiskScore ?? 0) > 0;
 
-  // Build chart-friendly data: pivot soreness history by date
-  const REGION_COLORS = ['#06b6d4', '#f59e0b', '#a78bfa', '#34d399', '#f87171', '#60a5fa', '#fb923c'];
-  const sorenessRegions = Array.from(
-    new Set(sorenessHistory.map(r => r.Side !== 'N/A' ? `${r.BodyPartName} (${r.Side})` : r.BodyPartName))
-  ).slice(0, 7);
-  const sorenesDates = Array.from(new Set(sorenessHistory.map(r => r.ReportDate))).sort();
-  const sorenessChartData = sorenesDates.map(date => {
-    const point: Record<string, string | number> = { date };
-    sorenessRegions.forEach(region => {
-      const match = sorenessHistory.find(r => {
-        const label = r.Side !== 'N/A' ? `${r.BodyPartName} (${r.Side})` : r.BodyPartName;
-        return r.ReportDate === date && label === region;
-      });
-      if (match) point[region] = match.SorenessLevel;
-    });
-    return point;
-  });
-
-  const chartData = [...sessions].reverse().map(s => ({
-    day: s.SessionDate,
-    workout: s.WorkoutName,
-  }));
-
-  // Build a set of dates with sessions for the calendar
-  const sessionDateSet = new Set(sessionHistory.map(s => s.SessionDate));
-  // Group sessions by date for hover details
-  const sessionsByDate: Record<string, SessionHistoryRow[]> = {};
-  sessionHistory.forEach(s => {
-    if (!sessionsByDate[s.SessionDate]) sessionsByDate[s.SessionDate] = [];
-    sessionsByDate[s.SessionDate].push(s);
-  });
-
-  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const DAY_LABELS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
-
-  const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: 'workout', label: 'Workout', icon: <Dumbbell size={16} /> },
-    { id: 'soreness', label: 'Soreness', icon: <Activity size={16} /> },
-    { id: 'history', label: 'History', icon: <CalendarDays size={16} /> },
-    { id: 'profile', label: 'Profile & Settings', icon: <User size={16} /> },
+  const TABS = [
+    { id: 'workout', label: 'Workout' },
+    { id: 'soreness', label: 'Soreness' },
+    { id: 'history', label: 'History' },
+    { id: 'profile', label: 'Profile' },
   ];
 
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col">
 
-      {/* ── TOP BAR ── */}
-      <header className="sticky top-0 z-10 bg-slate-950/90 backdrop-blur border-b border-slate-800">
+      {/* ================= HEADER ================= */}
+      <header className="border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-cyan-400">
-              Welcome back, {player.FirstName}!
-            </h1>
-            <p className="text-slate-400 text-xs mt-0.5">
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-            </p>
-          </div>
+
+          <h1 className="text-xl font-bold text-cyan-400">
+            Welcome back, {player.FirstName}
+          </h1>
 
           <div className="flex items-center gap-3">
-            {/* Recovery status badge */}
-            <span className={`hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border
-              ${atRisk
-                ? 'bg-red-950/50 border-red-700 text-red-300'
-                : 'bg-emerald-950/50 border-emerald-700 text-emerald-300'}`}>
-              {atRisk ? <AlertTriangle size={12} /> : <ShieldCheck size={12} />}
-              {atRisk ? 'Injury Risk' : 'Cleared to Train'}
+
+            {/* SEARCH BAR */}
+            <div className="hidden md:block w-64">
+              <SearchBar />
+            </div>
+
+            <span className={`px-3 py-1 rounded text-xs ${
+              atRisk ? 'bg-red-500' : 'bg-green-500'
+            }`}>
+              {atRisk ? 'Injury Risk' : 'Good'}
             </span>
 
-            <button
-              onClick={logout}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 hover:bg-slate-800 px-3 py-2 text-sm text-slate-400 hover:text-white transition-colors"
-            >
-              <LogOut size={15} />
-              Logout
+            <button onClick={logout} className="text-sm flex items-center gap-2">
+              <LogOut size={14} /> Logout
             </button>
           </div>
         </div>
 
-        {/* ── TAB NAV ── */}
-        <nav className="max-w-7xl mx-auto px-6 flex gap-1 border-t border-slate-800/60">
+        {/* ================= TABS ================= */}
+        <div className="flex gap-4 px-6">
           {TABS.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors
-                ${activeTab === tab.id
+              onClick={() => setActiveTab(tab.id as Tab)}
+              className={`py-3 border-b-2 ${
+                activeTab === tab.id
                   ? 'border-cyan-400 text-cyan-400'
-                  : 'border-transparent text-slate-400 hover:text-white hover:border-slate-600'}`}
+                  : 'text-gray-400'
+              }`}
             >
-              {tab.icon}
               {tab.label}
             </button>
           ))}
-        </nav>
+        </div>
       </header>
 
-      {/* ── PAGE CONTENT ── */}
-      <div className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
+      {/* ================= CONTENT ================= */}
+      <div className="p-6">
 
-        {/* ══ WORKOUT TAB ══ */}
+        {/* ================= WORKOUT TAB ================= */}
         {activeTab === 'workout' && (
           <div className="space-y-6">
-            {/* Injury risk banner */}
-            <div className={`rounded-xl border px-4 py-4 ${atRisk ? 'border-red-800/60 bg-red-950/30' : 'border-emerald-800/60 bg-emerald-950/30'}`}>
-              <div className={`flex items-center gap-2 font-semibold ${atRisk ? 'text-red-300' : 'text-emerald-300'}`}>
-                <ShieldCheck size={16} />
-                {atRisk ? 'Injury Risk Detected' : 'Good Recovery Status'}
-              </div>
-              <p className={`text-sm mt-1 ${atRisk ? 'text-red-200/90' : 'text-emerald-200/90'}`}>
-                {atRisk
-                  ? 'Review your soreness and follow the modified workout plan below.'
-                  : 'Your muscles are recovering well. You can proceed with normal training.'}
-              </p>
-              {latestReport && (
-                <div className="flex gap-4 mt-3 text-xs">
-                  <span className="text-slate-400">Progress score: <span className="text-white font-semibold">{latestReport.ProgressScore}</span></span>
-                  <span className="text-slate-400">Injury risk: <span className={`font-semibold ${atRisk ? 'text-red-300' : 'text-emerald-300'}`}>{latestReport.InjuryRiskScore}</span></span>
-                  <span className="text-slate-400">Last check-in: <span className="text-white font-semibold">{latestReport.ReportDate}</span></span>
+
+            {/* LOG WORKOUT */}
+            <section className="bg-slate-900 p-4 rounded-xl border border-slate-800">
+              <h2 className="text-lg font-semibold mb-3">Log Workout</h2>
+
+              {exercises.length === 0 ? (
+                <p className="text-slate-500 text-sm">No exercises available.</p>
+              ) : (
+                <div className="flex gap-3">
+                  <select
+                    value={workoutId ?? ''}
+                    onChange={(e) => setWorkoutId(Number(e.target.value))}
+                    className="bg-slate-800 p-2 rounded"
+                  >
+                    {exercises.map(e => (
+                      <option key={e.ExerciseID} value={e.ExerciseID}>
+                        {e.Name} ({e.TargetMuscle})
+                      </option>
+                    ))}
+                  </select>
+
+                  <input
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Notes..."
+                    className="bg-slate-800 p-2 rounded flex-1"
+                  />
+
+                  <button
+                    onClick={logWorkout}
+                    className="bg-cyan-500 px-4 py-2 rounded text-black"
+                  >
+                    Log
+                  </button>
                 </div>
               )}
-            </div>
+            </section>
 
-            {/* Workout recommendations */}
+            {/* EXISTING RECOMMENDATIONS */}
             <section>
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-4">
-                <Dumbbell size={18} />
-                Workout Recommendations
-                <span className="text-xs text-slate-500 font-normal ml-1">Based on your check-in</span>
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {workoutSuggestions.length === 0 ? (
-                  <p className="text-slate-500 text-sm col-span-3">No recommendations yet — complete a check-in first.</p>
-                ) : workoutSuggestions.map((item) => (
-                  <div key={item.WorkoutName} className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold">{item.WorkoutName}</h3>
-                      <span className="px-2 py-0.5 rounded-full text-xs border bg-cyan-500/15 text-cyan-300 border-cyan-500/40">
-                        {item.BodyPartName}
-                      </span>
-                    </div>
-                    <p className="text-slate-400 text-sm mb-4">{item.Reps} reps · {item.Duration} min</p>
-                    <button className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-semibold py-2.5 transition-colors">
-                      <Target size={16} />
-                      Start Workout
-                    </button>
+              <h2 className="text-lg mb-4">Workout Suggestions</h2>
+
+              <div className="grid md:grid-cols-3 gap-4">
+                {workoutSuggestions.map(w => (
+                  <div key={w.WorkoutName} className="bg-slate-800 p-4 rounded">
+                    <h3>{w.WorkoutName}</h3>
+                    <p>{w.Reps} reps</p>
+                    <p>{w.Duration} min</p>
                   </div>
                 ))}
               </div>
             </section>
 
-            {/* Recent sessions */}
+            {/* RECENT SESSIONS */}
             <section>
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-4">
-                <TrendingUp size={18} />
-                Recent Sessions
-              </h2>
-              {sessions.length === 0 ? (
-                <p className="text-slate-500 text-sm">No sessions logged yet.</p>
-              ) : (
-                <>
-                  <div className="h-[220px] w-full min-w-0 rounded-xl border border-slate-800 bg-slate-900 p-4">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                      <LineChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                        <XAxis dataKey="day" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                        <YAxis hide />
-                        <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }} itemStyle={{ color: '#06b6d4' }} />
-                        <Line type="monotone" dataKey="day" stroke="#06b6d4" strokeWidth={3} dot={{ r: 4, fill: '#06b6d4' }} activeDot={{ r: 6, strokeWidth: 0 }} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="mt-3 space-y-2">
-                    {sessions.map((s, i) => (
-                      <div key={i} className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm">
-                        <span className="font-medium">{s.WorkoutName}</span>
-                        <span className="text-slate-400">{s.SessionDate}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </section>
+              <h2 className="text-lg mb-4">Recent Sessions</h2>
 
-            {/* Notes */}
-            {sessions.some(s => s.Notes) && (
-              <section>
-                <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-4">
-                  <CalendarDays size={18} />
-                  Notes
-                </h2>
-                <div className="space-y-2">
-                  {sessions.filter(s => s.Notes).map((s, i) => (
-                    <div key={i} className="rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium">{s.WorkoutName}</span>
-                        <span className="text-slate-400">{s.SessionDate}</span>
-                      </div>
-                      <p className="text-slate-400 text-xs">{s.Notes}</p>
-                    </div>
-                  ))}
+              {sessions.map((s, i) => (
+                <div key={i} className="bg-slate-800 p-3 rounded mb-2">
+                  {s.WorkoutName} - {s.SessionDate}
                 </div>
-              </section>
-            )}
+              ))}
+            </section>
           </div>
         )}
 
-        {/* ══ SORENESS TAB ══ */}
+        {/* ================= SORENESS ================= */}
         {activeTab === 'soreness' && (
-          <div className="space-y-6">
-            {/* Sub-tab header row */}
-            <div className="flex items-center justify-between">
-              <div className="flex gap-1 rounded-lg border border-slate-800 bg-slate-900 p-1">
-                <button
-                  onClick={() => setSorenessSubTab('current')}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    sorenessSubTab === 'current'
-                      ? 'bg-cyan-500 text-black'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Current
-                </button>
-                <button
-                  onClick={() => setSorenessSubTab('history')}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    sorenessSubTab === 'history'
-                      ? 'bg-cyan-500 text-black'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  History
-                </button>
-              </div>
-              <a href="/check-in" className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black text-sm font-semibold transition-colors">
-                Update Check-In
-              </a>
-            </div>
+          <BodyMapDisplay
+            sorenessRows={data.sorenessEntries}
+            sex={player.Sex}
+          />
+        )}
 
-            {/* ── Current sub-tab ── */}
-            {sorenessSubTab === 'current' && (
-              <div className="space-y-4">
-                <p className="text-slate-400 text-sm">From your most recent check-in{latestReport ? ` on ${latestReport.ReportDate}` : ''}</p>
-                {sorenessEntries.length === 0 ? (
-                  <div className="rounded-xl border border-slate-800 bg-slate-900 p-10 text-center">
-                    <Activity className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                    <p className="text-slate-400 font-medium">No soreness recorded yet</p>
-                    <p className="text-slate-500 text-sm mt-1">Complete a check-in to see your soreness data here.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {sorenessEntries.map((entry, i) => {
-                      const level = entry.SorenessLevel;
-                      const color = level >= 7 ? 'border-red-700 bg-red-950/30 text-red-300'
-                        : level >= 4 ? 'border-yellow-700 bg-yellow-950/30 text-yellow-300'
-                        : 'border-emerald-700 bg-emerald-950/30 text-emerald-300';
-                      const bar = level >= 7 ? 'bg-red-500' : level >= 4 ? 'bg-yellow-500' : 'bg-emerald-500';
-                      return (
-                        <div key={i} className={`rounded-xl border p-4 ${color}`}>
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="font-semibold text-white">
-                              {entry.BodyPartName}{entry.Side !== 'N/A' ? ` (${entry.Side})` : ''}
-                            </span>
-                            <span className="text-lg font-bold">{level}<span className="text-sm font-normal text-slate-400">/10</span></span>
-                          </div>
-                          <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full transition-all ${bar}`} style={{ width: `${level * 10}%` }} />
-                          </div>
-                          <p className="text-xs mt-2 opacity-75">
-                            {level >= 7 ? 'High — avoid loading this area' : level >= 4 ? 'Moderate — train with caution' : 'Low — cleared for normal training'}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── History sub-tab ── */}
-            {sorenessSubTab === 'history' && (
-              <div className="space-y-4">
-                <p className="text-slate-400 text-sm">Soreness trends across all body regions — last 30 days</p>
-                {sorenessHistory.length === 0 ? (
-                  <div className="rounded-xl border border-slate-800 bg-slate-900 p-10 text-center">
-                    <TrendingUp className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                    <p className="text-slate-400 font-medium">No history yet</p>
-                    <p className="text-slate-500 text-sm mt-1">Complete multiple check-ins to see trends over time.</p>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 h-[320px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={sorenessChartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                        <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                        <YAxis domain={[0, 10]} stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={24} />
-                        <Tooltip
-                          contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
-                          itemStyle={{ color: '#e2e8f0' }}
-                          labelStyle={{ color: '#94a3b8', marginBottom: 4 }}
-                        />
-                        <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8', paddingTop: 8 }} />
-                        {sorenessRegions.map((region, i) => (
-                          <Line
-                            key={region}
-                            type="monotone"
-                            dataKey={region}
-                            stroke={REGION_COLORS[i % REGION_COLORS.length]}
-                            strokeWidth={2}
-                            dot={{ r: 3 }}
-                            activeDot={{ r: 5, strokeWidth: 0 }}
-                            connectNulls
-                          />
-                        ))}
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </div>
-            )}
+        {/* ================= HISTORY ================= */}
+        {activeTab === 'history' && (
+          <div>
+            {sessions.map((s, i) => (
+              <div key={i}>{s.WorkoutName} - {s.SessionDate}</div>
+            ))}
           </div>
         )}
 
-        {/* ══ HISTORY TAB ══ */}
-        {activeTab === 'history' && (() => {
-          const today = new Date();
-          const todayStr = today.toISOString().slice(0, 10);
-          const isCurrentMonth = calendarOffset === 0;
-
-          // Show 2 months: calendarOffset+1 (older) and calendarOffset (newer)
-          const visibleMonths = [1, 0].map(extra => {
-            const d = new Date(today.getFullYear(), today.getMonth() - calendarOffset - extra, 1);
-            return { year: d.getFullYear(), monthIdx: d.getMonth() };
-          });
-          const newerMonth = visibleMonths[1];
-
-          // Build soreness lookup by date
-          const sorenessHistoryByDate: Record<string, SorenessHistoryRow[]> = {};
-          sorenessHistory.forEach(r => {
-            if (!sorenessHistoryByDate[r.ReportDate]) sorenessHistoryByDate[r.ReportDate] = [];
-            sorenessHistoryByDate[r.ReportDate].push(r);
-          });
-
-          const selectedSessions = selectedCalendarDate ? (sessionsByDate[selectedCalendarDate] ?? []) : [];
-          const selectedSoreness = selectedCalendarDate ? (sorenessHistoryByDate[selectedCalendarDate] ?? []) : [];
-
-          return (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-cyan-300">History</h2>
-                  <p className="text-slate-400 text-sm">
-                    {MONTH_NAMES[visibleMonths[0].monthIdx]} {visibleMonths[0].year}
-                    {' – '}
-                    {MONTH_NAMES[newerMonth.monthIdx]} {newerMonth.year}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-4 items-start">
-              <div className="flex flex-col gap-4 w-2/3">
-                {/* Date scrubbing controls */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <select
-                    value={newerMonth.monthIdx}
-                    onChange={e => {
-                      const targetMonth = Number(e.target.value);
-                      const diff = (today.getFullYear() - newerMonth.year) * 12 + (today.getMonth() - targetMonth);
-                      setCalendarOffset(Math.max(0, diff));
-                      setSelectedCalendarDate(null);
-                    }}
-                    className="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-cyan-500"
-                  >
-                    {MONTH_NAMES.map((m, i) => (
-                      <option key={i} value={i}>{m}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={newerMonth.year}
-                    onChange={e => {
-                      const targetYear = Number(e.target.value);
-                      const diff = (targetYear - today.getFullYear()) * -12 + (today.getMonth() - newerMonth.monthIdx);
-                      setCalendarOffset(Math.max(0, diff));
-                      setSelectedCalendarDate(null);
-                    }}
-                    className="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-cyan-500"
-                  >
-                    {Array.from({ length: 5 }, (_, i) => today.getFullYear() - i).map(y => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
-                  <div className="w-px h-5 bg-slate-700" />
-                  <button
-                    onClick={() => { setCalendarOffset(o => o + 1); setSelectedCalendarDate(null); }}
-                    className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors text-xs"
-                  >
-                    ← Prev
-                  </button>
-                  <button
-                    onClick={() => { setCalendarOffset(o => Math.max(0, o - 1)); setSelectedCalendarDate(null); }}
-                    disabled={isCurrentMonth}
-                    className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors text-xs disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    Next →
-                  </button>
-                  <button
-                    onClick={() => { setCalendarOffset(0); setSelectedCalendarDate(null); }}
-                    disabled={isCurrentMonth}
-                    className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition-colors text-xs disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    Today
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {visibleMonths.map(({ year, monthIdx }) => {
-                  const firstDay = new Date(year, monthIdx, 1).getDay();
-                  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
-                  const cells: (number | null)[] = [
-                    ...Array(firstDay).fill(null),
-                    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-                  ];
-                  return (
-                    <div key={`${year}-${monthIdx}`} className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-                      <p className="text-sm font-semibold text-slate-300 mb-3">
-                        {MONTH_NAMES[monthIdx]} <span className="text-slate-500 font-normal">{year}</span>
-                      </p>
-                      <div className="grid grid-cols-7 gap-0.5 text-center">
-                        {DAY_LABELS.map(d => (
-                          <div key={d} className="text-slate-600 text-[10px] pb-1">{d}</div>
-                        ))}
-                        {cells.map((day, ci) => {
-                          if (!day) return <div key={ci} />;
-                          const dateStr = `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                          const hasSession = sessionDateSet.has(dateStr);
-                          const isToday = dateStr === todayStr;
-                          const isSelected = dateStr === selectedCalendarDate;
-                          const daySoreness = sorenessHistoryByDate[dateStr];
-                          const maxSoreness = daySoreness ? Math.max(...daySoreness.map(r => r.SorenessLevel)) : 0;
-                          const sorenessColor = maxSoreness >= 7 ? 'bg-red-500' : maxSoreness >= 4 ? 'bg-yellow-400' : maxSoreness > 0 ? 'bg-green-400' : '';
-                          return (
-                            <button
-                              key={ci}
-                              onClick={() => setSelectedCalendarDate(isSelected ? null : dateStr)}
-                              className={`relative flex flex-col items-center justify-center rounded text-[11px] h-7 w-full transition-colors
-                                ${isSelected ? 'ring-2 ring-white' : isToday ? 'ring-1 ring-cyan-500' : ''}
-                                ${hasSession
-                                  ? 'bg-cyan-500 text-black font-semibold hover:bg-cyan-400'
-                                  : 'text-slate-500 hover:bg-slate-800'
-                                }`}
-                            >
-                              <span className="leading-none relative -top-[3px]">{day}</span>
-                              {maxSoreness > 0 && (
-                                <span className={`absolute bottom-[3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full ring-1 ring-black/60 ${sorenessColor}`} />
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-                <p className="text-slate-500 text-xs text-center">
-                  {!selectedCalendarDate
-                    ? 'Select a day to highlight soreness'
-                    : selectedSoreness.length === 0
-                    ? 'No soreness logged for this day'
-                    : null}
-                </p>
-              </div>
-              {/* Body map beside calendars */}
-              <div className="shrink-0 flex flex-col items-center gap-2">
-                <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wide text-center w-full">Soreness Map</p>
-                <BodyMapDisplay sorenessRows={selectedSoreness} sex={player.Sex} scale={0.85} />
-              </div>
-              </div>
-
-              {/* Legend */}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-400">
-                <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded bg-cyan-500" /> Session logged</span>
-                <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded ring-1 ring-cyan-500" /> Today</span>
-                <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded ring-2 ring-white" /> Selected</span>
-                <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-green-400" /> Low soreness (1–3)</span>
-                <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-yellow-400" /> Moderate soreness (4–6)</span>
-                <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-red-500" /> High soreness (7–10)</span>
-              </div>
-
-              {/* Day detail panel */}
-              {selectedCalendarDate && (
-                <div className="rounded-xl border border-slate-700 bg-slate-900 p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-slate-200">{selectedCalendarDate}</h3>
-                    <button
-                      onClick={() => setSelectedCalendarDate(null)}
-                      className="text-slate-500 hover:text-slate-300 text-xs"
-                    >
-                      ✕ Close
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-[7fr_3fr] gap-6">
-                    {/* Workouts */}
-                    <div>
-                      <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wide mb-2">Workouts</p>
-                      {selectedSessions.length === 0 ? (
-                        <p className="text-slate-500 text-sm">No sessions logged</p>
-                      ) : (
-                        <ul className="space-y-2">
-                          {selectedSessions.map((s, i) => (
-                            <li key={i} className="text-sm">
-                              <span className="font-medium text-slate-200">{s.WorkoutName}</span>
-                              {s.Notes && <p className="text-slate-400 text-xs mt-0.5">{s.Notes}</p>}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    {/* Soreness */}
-                    <div>
-                      <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wide mb-2">Soreness</p>
-                      {selectedSoreness.length === 0 ? (
-                        <p className="text-slate-500 text-sm">No soreness logged</p>
-                      ) : (
-                        <ul className="space-y-1.5">
-                          {selectedSoreness.map((r, i) => (
-                            <li key={i} className="flex items-center justify-between text-sm">
-                              <span className="text-slate-300">{r.BodyPartName}{r.Side && r.Side !== 'N/A' ? ` (${r.Side})` : ''}</span>
-                              <span className={`ml-3 font-semibold tabular-nums ${
-                                r.SorenessLevel >= 7 ? 'text-red-400' :
-                                r.SorenessLevel >= 4 ? 'text-yellow-400' :
-                                'text-green-400'
-                              }`}>{r.SorenessLevel}/10</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {/* ══ PROFILE & SETTINGS TAB ══ */}
+        {/* ================= PROFILE ================= */}
         {activeTab === 'profile' && (
-          <div className="space-y-6 max-w-2xl">
-            {/* Personal Info */}
-            <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300">
-                  <User size={18} />
-                  Personal Information
-                </h2>
-                {!editing ? (
-                  <button
-                    onClick={startEditing}
-                    className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors text-xs"
-                  >
-                    Edit
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={cancelEditing}
-                      className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-400 hover:text-white transition-colors text-xs"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={saveProfile}
-                      disabled={saving}
-                      className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black font-semibold transition-colors text-xs"
-                    >
-                      {saving ? 'Saving…' : 'Save'}
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {saveError && (
-                <p className="text-red-400 text-xs mb-4">{saveError}</p>
-              )}
-
-              {!editing ? (
-                <div className="grid grid-cols-2 gap-y-4 text-sm">
-                  <span className="text-slate-400">First Name</span><span>{player.FirstName}</span>
-                  <span className="text-slate-400">Last Name</span><span>{player.LastName}</span>
-                  <span className="text-slate-400">Date of Birth</span><span>{player.DateOfBirth}</span>
-                  <span className="text-slate-400">Sex</span><span>{player.Sex}</span>
-                  <span className="text-slate-400">Height</span><span>{player.Height}&quot;</span>
-                  <span className="text-slate-400">Weight</span><span>{player.Weight} lbs</span>
-                  <span className="text-slate-400">Sport</span><span>{player.SportPlayed}</span>
-                  <span className="text-slate-400">Team</span><span>{player.Team}</span>
-                  <span className="text-slate-400">Hrs / Week</span><span>{player.HoursSpentWorkingOut}</span>
-                </div>
-              ) : form && (
-                <div className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-slate-400 text-xs">First Name</label>
-                    <input
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.firstName}
-                      onChange={e => setForm({ ...form, firstName: e.target.value })}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-slate-400 text-xs">Last Name</label>
-                    <input
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.lastName}
-                      onChange={e => setForm({ ...form, lastName: e.target.value })}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-slate-400 text-xs">Date of Birth</label>
-                    <input
-                      type="date"
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.dateOfBirth}
-                      onChange={e => setForm({ ...form, dateOfBirth: e.target.value })}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-slate-400 text-xs">Sex</label>
-                    <select
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.sex}
-                      onChange={e => setForm({ ...form, sex: e.target.value })}
-                    >
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-slate-400 text-xs">Height (inches)</label>
-                    <input
-                      type="number"
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.height}
-                      onChange={e => setForm({ ...form, height: Number(e.target.value) })}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-slate-400 text-xs">Weight (lbs)</label>
-                    <input
-                      type="number"
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.weight}
-                      onChange={e => setForm({ ...form, weight: Number(e.target.value) })}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-slate-400 text-xs">Sport</label>
-                    <input
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.sportPlayed}
-                      onChange={e => setForm({ ...form, sportPlayed: e.target.value })}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-slate-400 text-xs">Team</label>
-                    <input
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.team}
-                      onChange={e => setForm({ ...form, team: e.target.value })}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1 col-span-2">
-                    <label className="text-slate-400 text-xs">Hours Working Out / Week</label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.hoursSpentWorkingOut}
-                      onChange={e => setForm({ ...form, hoursSpentWorkingOut: Number(e.target.value) })}
-                    />
-                  </div>
-                </div>
-              )}
-            </section>
-            {/* ══ COACH MANAGEMENT ══ */}
-            <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300">
-                  <ShieldCheck size={18} />
-                  My Coaches
-                </h2>
-              </div>
-
-            {/* ── INVITE BOX (UI ONLY) ── */}
-              <div className="mb-6 p-4 rounded-xl bg-slate-950/50 border border-slate-800">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
-                  Invite New Coach
-                </label>
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    placeholder="Coach username or email..." 
-                    value={inviteCoachValue}
-                    onChange={(e) => setInviteCoachValue(e.target.value)}
-                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500 text-white"
-                  />
-                  <button 
-                    onClick={handleInviteCoachUI}
-                    disabled={!inviteCoachValue}
-                    className="bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-black px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
-                  >
-                    Invite
-                  </button>
-                </div>
-
-                {/* Confirmation Message */}
-                {showInviteSuccess && (
-                  <div className="mt-3 flex items-center gap-2 text-emerald-400 text-sm font-medium animate-in fade-in slide-in-from-top-1">
-                    <CheckCircle2 size={14} />
-                    Coach invited!
-                  </div>
-                )}
-              </div>
-
-            {/* Coaches List */}
-            <div className="space-y-3">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block px-1">
-                Active Coaches
-              </label>
-              {data.coaches?.length === 0 ? (
-                <p className="text-slate-500 text-sm italic px-1">No coaches assigned to your profile.</p>
-              ) : (
-                data.coaches?.map(coach => (
-                  <div key={coach.PersonID} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/40 border border-slate-800 group hover:border-slate-700 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-xs">
-                        {coach.FirstName[0]}{coach.LastName[0]}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-white">{coach.FirstName} {coach.LastName}</p>
-                        <p className="text-[10px] text-slate-500">{coach.Email}</p>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => handleRemoveCoach(coach.PersonID)}
-                      className="text-slate-500 hover:text-red-400 p-2 rounded-lg hover:bg-red-400/10 transition-all"
-                      title="Remove Coach"
-                    >
-                      <LogOut size={16} className="rotate-180" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-
-            {/* Settings */}
-            <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-5">
-                <Settings size={18} />
-                Settings
-              </h2>
-              <div className="space-y-4 text-sm">
-                <div className="flex items-center justify-between py-3 border-b border-slate-800">
-                  <div>
-                    <p className="font-medium">Account</p>
-                    <p className="text-slate-400 text-xs mt-0.5">Manage your login credentials</p>
-                  </div>
-                  <button className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors text-xs">
-                    Change Password
-                  </button>
-                </div>
-                <div className="flex items-center justify-between py-3">
-                  <div>
-                    <p className="font-medium text-red-400">Sign Out</p>
-                    <p className="text-slate-400 text-xs mt-0.5">Log out of your account</p>
-                  </div>
-                  <button
-                    onClick={logout}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-red-800 text-red-400 hover:bg-red-950/50 transition-colors text-xs"
-                  >
-                    <LogOut size={13} />
-                    Logout
-                  </button>
-                </div>
-              </div>
-            </section>
+          <div>
+            <p>{player.FirstName} {player.LastName}</p>
           </div>
         )}
 
