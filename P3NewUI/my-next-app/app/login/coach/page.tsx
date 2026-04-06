@@ -33,6 +33,13 @@ function CoachLoginForm() {
                 setError('This account is not a coach account');
                 return;
             }
+            localStorage.setItem('session', JSON.stringify({
+                personId: data.personId,
+                firstName: data.firstName,
+                lastName: data.lastName,
+                role: data.role,
+                sex: data.sex ?? null,
+            }));
             router.push('/coach');
         } catch {
             setError('Network error – please try again');

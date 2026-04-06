@@ -128,6 +128,7 @@ export default function CoachDashboard() {
   const [isManagingRoster, setIsManagingRoster] = useState(false);
 
   const logout = async () => {
+    localStorage.removeItem('session');
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
   };

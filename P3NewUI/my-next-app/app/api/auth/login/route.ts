@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       .setExpirationTime('8h')
       .sign(secret);
 
-    const response = NextResponse.json({ ok: true, role });
+    const response = NextResponse.json({ ok: true, role, personId: person.PersonID, firstName: person.FirstName, lastName: person.LastName, sex: athlete?.Sex ?? null });
     response.cookies.set('session', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
