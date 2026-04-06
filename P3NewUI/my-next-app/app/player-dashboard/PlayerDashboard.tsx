@@ -700,7 +700,7 @@ export default function PlayerDashboard() {
                       ✕ Close
                     </button>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-[7fr_3fr] gap-6">
                     {/* Workouts */}
                     <div>
                       <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wide mb-2">Workouts</p>
