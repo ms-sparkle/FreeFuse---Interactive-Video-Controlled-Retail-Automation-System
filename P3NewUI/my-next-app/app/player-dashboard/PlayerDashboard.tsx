@@ -2,24 +2,26 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Activity, AlertTriangle, CalendarDays, Dumbbell, LogOut,
-  Settings, ShieldCheck, Target, TrendingUp, User, CheckCircle2
+  Activity, CalendarDays, Dumbbell, LogOut,
+  ShieldCheck, TrendingUp, User
 } from 'lucide-react';
-import {
-  LineChart, Line, XAxis, YAxis,
-  CartesianGrid, Tooltip, ResponsiveContainer, Legend
-} from 'recharts';
 
 import BodyMapDisplay from '../components/BodyMapDisplay';
-import SearchBar from '../components/SearchBar'; 
+import SearchBar from '../components/SearchBar';
 
 // ================= TYPES =================
 type Tab = 'workout' | 'soreness' | 'history' | 'profile';
 
-type Exercise = { 
+type Exercise = {
   ExerciseID: number;
   Name: string;
   TargetMuscle: string;
+};
+
+type Recommendation = {
+  WorkoutID: number;
+  WorkoutName: string;
+  BodyPartName: string;
 };
 
 type PlayerData = {
@@ -27,37 +29,20 @@ type PlayerData = {
     PersonID: number;
     FirstName: string;
     LastName: string;
-    DateOfBirth: string;
-    SportPlayed: string;
-    Team: string;
     Sex: string;
-    Height: number;
-    Weight: number;
-    HoursSpentWorkingOut: number;
   };
-  latestReport: {
-    ProgressScore: number;
-    InjuryRiskScore: number;
-    ReportDate: string;
-  } | null;
   sorenessEntries: {
     BodyPartName: string;
     Side: string;
     SorenessLevel: number;
   }[];
-  workoutSuggestions: {
-    WorkoutName: string;
-    Duration: number;
-    Reps: number;
-    BodyPartName: string;
-  }[];
   sessions: {
     SessionDate: string;
     WorkoutName: string;
-    Notes: string;
   }[];
 };
 
+// ================= COMPONENT =================
 export default function PlayerDashboard() {
   const router = useRouter();
 
@@ -65,16 +50,14 @@ export default function PlayerDashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('workout');
 
-  // WORKOUT LOGGER STATE
+  // 🔥 WORKOUT LOGGER
   const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [notes, setNotes] = useState('');
   const [workoutId, setWorkoutId] = useState<number | null>(null);
+  const [notes, setNotes] = useState('');
 
-  // ================= LOGOUT =================
-  const logout = () => {
-    localStorage.removeItem('session');
-    router.push('/login');
-  };
+  // 🤖 AI
+  const [aiRecommendations, setAiRecommendations] = useState<Recommendation[]>([]);
+  const [aiMessage, setAiMessage] = useState('');
 
   // ================= LOAD DATA =================
   useEffect(() => {
@@ -83,13 +66,13 @@ export default function PlayerDashboard() {
 
     const session = JSON.parse(raw);
 
-    // Player data
+    // Player
     fetch(`/api/player/${session.personId}`)
       .then(r => r.json())
       .then(setData)
       .finally(() => setLoading(false));
 
-    //  LOAD EXERCISES
+    // Exercises
     fetch('/api/exercises')
       .then(r => r.json())
       .then(d => {
@@ -97,8 +80,21 @@ export default function PlayerDashboard() {
         if (d.exercises?.length > 0) {
           setWorkoutId(d.exercises[0].ExerciseID);
         }
-      })
-      .catch(console.error);
+      });
+
+    // AI Recommendations
+    fetch(`/api/recommendations?athleteId=${session.personId}`)
+      .then(r => r.json())
+      .then(d => {
+        const recs = d.recommendations ?? [];
+        setAiRecommendations(recs);
+
+        if (recs.length === 0) {
+          setAiMessage("You're fully recovered — train anything today.");
+        } else {
+          setAiMessage("Adjusted based on soreness & recent workouts.");
+        }
+      });
 
   }, []);
 
@@ -125,20 +121,29 @@ export default function PlayerDashboard() {
       setNotes('');
       alert('Workout logged!');
 
-      // refresh dashboard
+      // Refresh dashboard
       const updated = await fetch(`/api/player/${session.personId}`).then(r => r.json());
       setData(updated);
+
+      // 🔥 Refresh AI
+      const ai = await fetch(`/api/recommendations?athleteId=${session.personId}`).then(r => r.json());
+      setAiRecommendations(ai.recommendations ?? []);
 
     } catch {
       alert('Failed to log workout.');
     }
   };
 
+  // ================= LOGOUT =================
+  const logout = () => {
+    localStorage.removeItem('session');
+    router.push('/login');
+  };
+
   if (loading) return <div className="text-white p-10">Loading...</div>;
   if (!data) return <div className="text-white p-10">No data</div>;
 
-  const { player, latestReport, workoutSuggestions, sessions } = data;
-  const atRisk = (latestReport?.InjuryRiskScore ?? 0) > 0;
+  const { player, sessions } = data;
 
   const TABS = [
     { id: 'workout', label: 'Workout' },
@@ -148,126 +153,114 @@ export default function PlayerDashboard() {
   ];
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex flex-col">
+    <main className="min-h-screen bg-slate-950 text-white">
 
-      {/* ================= HEADER ================= */}
-      <header className="border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      {/* HEADER */}
+      <header className="border-b border-slate-800 p-4 flex justify-between items-center">
+        <h1 className="text-xl text-cyan-400">
+          Welcome, {player.FirstName}
+        </h1>
 
-          <h1 className="text-xl font-bold text-cyan-400">
-            Welcome back, {player.FirstName}
-          </h1>
-
-          <div className="flex items-center gap-3">
-
-            {/* SEARCH BAR */}
-            <div className="hidden md:block w-64">
-              <SearchBar />
-            </div>
-
-            <span className={`px-3 py-1 rounded text-xs ${
-              atRisk ? 'bg-red-500' : 'bg-green-500'
-            }`}>
-              {atRisk ? 'Injury Risk' : 'Good'}
-            </span>
-
-            <button onClick={logout} className="text-sm flex items-center gap-2">
-              <LogOut size={14} /> Logout
-            </button>
+        <div className="flex items-center gap-3">
+          <div className="hidden md:block w-64">
+            <SearchBar />
           </div>
-        </div>
 
-        {/* ================= TABS ================= */}
-        <div className="flex gap-4 px-6">
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as Tab)}
-              className={`py-3 border-b-2 ${
-                activeTab === tab.id
-                  ? 'border-cyan-400 text-cyan-400'
-                  : 'text-gray-400'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          <button onClick={logout}>
+            <LogOut size={18} />
+          </button>
         </div>
       </header>
 
-      {/* ================= CONTENT ================= */}
-      <div className="p-6">
+      {/* TABS */}
+      <div className="flex gap-4 px-6 border-b border-slate-800">
+        {TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as Tab)}
+            className={`py-3 ${
+              activeTab === tab.id ? 'text-cyan-400' : 'text-gray-400'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-        {/* ================= WORKOUT TAB ================= */}
+      {/* CONTENT */}
+      <div className="p-6 space-y-6">
+
+        {/* WORKOUT TAB */}
         {activeTab === 'workout' && (
-          <div className="space-y-6">
-
+          <>
             {/* LOG WORKOUT */}
-            <section className="bg-slate-900 p-4 rounded-xl border border-slate-800">
-              <h2 className="text-lg font-semibold mb-3">Log Workout</h2>
+            <section className="bg-slate-900 p-4 rounded-xl">
+              <h2 className="mb-3 font-semibold">Log Workout</h2>
 
-              {exercises.length === 0 ? (
-                <p className="text-slate-500 text-sm">No exercises available.</p>
-              ) : (
-                <div className="flex gap-3">
-                  <select
-                    value={workoutId ?? ''}
-                    onChange={(e) => setWorkoutId(Number(e.target.value))}
-                    className="bg-slate-800 p-2 rounded"
-                  >
-                    {exercises.map(e => (
-                      <option key={e.ExerciseID} value={e.ExerciseID}>
-                        {e.Name} ({e.TargetMuscle})
-                      </option>
-                    ))}
-                  </select>
+              <div className="flex gap-2">
+                <select
+                  value={workoutId ?? ''}
+                  onChange={(e) => setWorkoutId(Number(e.target.value))}
+                  className="bg-slate-800 p-2 rounded"
+                >
+                  {exercises.map(e => (
+                    <option key={e.ExerciseID} value={e.ExerciseID}>
+                      {e.Name}
+                    </option>
+                  ))}
+                </select>
 
-                  <input
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Notes..."
-                    className="bg-slate-800 p-2 rounded flex-1"
-                  />
+                <input
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Notes..."
+                  className="bg-slate-800 p-2 rounded flex-1"
+                />
 
-                  <button
-                    onClick={logWorkout}
-                    className="bg-cyan-500 px-4 py-2 rounded text-black"
-                  >
-                    Log
-                  </button>
-                </div>
-              )}
+                <button
+                  onClick={logWorkout}
+                  className="bg-cyan-500 px-4 rounded text-black"
+                >
+                  Log
+                </button>
+              </div>
             </section>
 
-            {/* EXISTING RECOMMENDATIONS */}
+            {/* AI RECOMMENDATIONS */}
             <section>
-              <h2 className="text-lg mb-4">Workout Suggestions</h2>
+              <h2 className="text-lg font-semibold mb-2">AI Recommendations</h2>
+              <p className="text-cyan-400 text-sm mb-4">{aiMessage}</p>
 
               <div className="grid md:grid-cols-3 gap-4">
-                {workoutSuggestions.map(w => (
-                  <div key={w.WorkoutName} className="bg-slate-800 p-4 rounded">
-                    <h3>{w.WorkoutName}</h3>
-                    <p>{w.Reps} reps</p>
-                    <p>{w.Duration} min</p>
+                {aiRecommendations.map(rec => (
+                  <div key={rec.WorkoutID} className="bg-slate-900 p-4 rounded">
+                    <h3>{rec.WorkoutName}</h3>
+                    <p className="text-sm text-gray-400">{rec.BodyPartName}</p>
+
+                    <button
+                      onClick={() => setWorkoutId(rec.WorkoutID)}
+                      className="mt-2 w-full bg-cyan-500 text-black py-1 rounded"
+                    >
+                      Select
+                    </button>
                   </div>
                 ))}
               </div>
             </section>
 
-            {/* RECENT SESSIONS */}
+            {/* RECENT */}
             <section>
-              <h2 className="text-lg mb-4">Recent Sessions</h2>
-
+              <h2 className="font-semibold mb-2">Recent Sessions</h2>
               {sessions.map((s, i) => (
-                <div key={i} className="bg-slate-800 p-3 rounded mb-2">
+                <div key={i} className="bg-slate-800 p-2 rounded mb-1">
                   {s.WorkoutName} - {s.SessionDate}
                 </div>
               ))}
             </section>
-          </div>
+          </>
         )}
 
-        {/* ================= SORENESS ================= */}
+        {/* SORENESS */}
         {activeTab === 'soreness' && (
           <BodyMapDisplay
             sorenessRows={data.sorenessEntries}
@@ -275,19 +268,19 @@ export default function PlayerDashboard() {
           />
         )}
 
-        {/* ================= HISTORY ================= */}
+        {/* HISTORY */}
         {activeTab === 'history' && (
           <div>
             {sessions.map((s, i) => (
-              <div key={i}>{s.WorkoutName} - {s.SessionDate}</div>
+              <div key={i}>{s.WorkoutName}</div>
             ))}
           </div>
         )}
 
-        {/* ================= PROFILE ================= */}
+        {/* PROFILE */}
         {activeTab === 'profile' && (
           <div>
-            <p>{player.FirstName} {player.LastName}</p>
+            {player.FirstName} {player.LastName}
           </div>
         )}
 
