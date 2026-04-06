@@ -65,20 +65,66 @@ export default function PlayerDashboard() {
   const [form, setForm] = useState<ProfileForm | null>(null);
   const [inviteCoachValue, setInviteCoachValue] = useState('');
   const [showInviteSuccess, setShowInviteSuccess] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
 
-  const handleInviteCoachUI = () => {
-      if (!inviteCoachValue) return;
-
-      // 1. Clear the text field
+  const handleInviteCoachUI = async () => {
+    if (!inviteCoachValue) return;
+    try {
+      const res = await fetch('/api/player/invite-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: inviteCoachValue }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        alert(json.error ?? 'Failed to invite coach');
+        return;
+      }
       setInviteCoachValue('');
-
-      // 2. Show the confirmation message
       setShowInviteSuccess(true);
+      setTimeout(() => setShowInviteSuccess(false), 3000);
+      // Refresh coaches list
+      const sessionRes = await fetch('/api/auth/session');
+      if (sessionRes.ok) {
+        const session = await sessionRes.json();
+        const updated = await fetch(`/api/player/${session.personId}`).then(r => r.json());
+        setData(updated);
+      }
+    } catch {
+      alert('Network error. Please try again.');
+    }
+  };
 
-      // 3. Hide the message after 3 seconds
-      setTimeout(() => {
-        setShowInviteSuccess(false);
-      }, 3000);
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess(false);
+    setSavingPassword(true);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPasswordError(data.error ?? 'Failed to change password');
+      } else {
+        setPasswordSuccess(true);
+        setCurrentPassword('');
+        setNewPassword('');
+        setTimeout(() => { setShowPasswordModal(false); setPasswordSuccess(false); }, 1500);
+      }
+    } catch {
+      setPasswordError('Network error. Please try again.');
+    } finally {
+      setSavingPassword(false);
+    }
   };
 
   const handleRemoveCoach = async (coachId: number) => {
@@ -607,7 +653,10 @@ export default function PlayerDashboard() {
                     <p className="font-medium">Account</p>
                     <p className="text-slate-400 text-xs mt-0.5">Manage your login credentials</p>
                   </div>
-                  <button className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors text-xs">
+                  <button
+                    onClick={() => { setShowPasswordModal(true); setPasswordError(''); setPasswordSuccess(false); }}
+                    className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors text-xs"
+                  >
                     Change Password
                   </button>
                 </div>
@@ -630,6 +679,55 @@ export default function PlayerDashboard() {
         )}
 
       </div>
+
+      {/* ── CHANGE PASSWORD MODAL ── */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl p-6">
+            <h2 className="text-lg font-bold mb-4">Change Password</h2>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Current Password</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={e => setCurrentPassword(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"
+                  placeholder="Current password"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500"
+                  placeholder="New password (min. 6 chars)"
+                />
+              </div>
+              {passwordError && <p className="text-red-400 text-xs">{passwordError}</p>}
+              {passwordSuccess && <p className="text-emerald-400 text-xs">Password updated!</p>}
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(false)}
+                  className="flex-1 py-2 rounded-lg border border-slate-700 text-slate-400 hover:text-white transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingPassword}
+                  className="flex-1 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black font-semibold transition-colors text-sm"
+                >
+                  {savingPassword ? 'Saving…' : 'Update'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

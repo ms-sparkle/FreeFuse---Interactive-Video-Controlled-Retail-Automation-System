@@ -2,26 +2,57 @@
 
 import React, { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { UserPlus, Mail, Lock, User, ArrowLeft, Shield } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { UserPlus, Lock, User, ArrowLeft, Shield } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 
 function RegisterContent() {
     const searchParams = useSearchParams();
+    const router = useRouter();
 
-    // Grab the URL parameter, default to athlete if missing
     const initialRole = searchParams.get('role') === 'coach' ? 'coach' : 'athlete';
-
-    // We use state so if they change the dropdown, the theme instantly updates!
     const [role, setRole] = useState(initialRole);
-    const isCoach = role === 'coach';
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [submitting, setSubmitting] = useState(false);
 
-    // Dynamic Theme Variables with smooth transitions
+    const isCoach = role === 'coach';
     const iconBg = isCoach ? 'bg-amber-500/10' : 'bg-cyan-500/10';
     const iconText = isCoach ? 'text-amber-500' : 'text-cyan-400';
     const inputFocus = isCoach ? 'focus:border-amber-500 focus:ring-amber-500' : 'focus:border-cyan-500 focus:ring-cyan-500';
     const buttonBg = isCoach ? 'bg-amber-500 hover:bg-amber-400' : 'bg-cyan-500 hover:bg-cyan-400';
     const linkText = isCoach ? 'text-amber-500 hover:text-amber-400' : 'text-cyan-400 hover:text-cyan-300';
     const backLink = isCoach ? '/login/coach' : '/login/athlete';
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        if (!firstName || !lastName || !username || !password) {
+            setError('All fields are required.');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const res = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ firstName, lastName, username, password, role }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setError(data.error ?? 'Registration failed.');
+                return;
+            }
+            router.push(backLink + '?registered=1');
+        } catch {
+            setError('Network error. Please try again.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
     return (
         <div className="w-full max-w-md bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl mt-12 mb-12 relative z-10 transition-colors duration-500">
@@ -33,34 +64,50 @@ function RegisterContent() {
                 <p className="text-slate-400 text-sm mt-1">Join the WeaveStream platform</p>
             </div>
 
-            <form className="space-y-5">
-                {/* Full Name */}
+            <form className="space-y-5" onSubmit={handleSubmit}>
+                {/* First / Last Name */}
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">First Name</label>
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={firstName}
+                                onChange={e => setFirstName(e.target.value)}
+                                className={`w-full bg-slate-950 border border-slate-700 rounded-lg pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-1 transition-all ${inputFocus}`}
+                                placeholder="Jane"
+                            />
+                            <User className="absolute left-4 top-3.5 text-slate-500 w-5 h-5" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-400 mb-1">Last Name</label>
+                        <input
+                            type="text"
+                            value={lastName}
+                            onChange={e => setLastName(e.target.value)}
+                            className={`w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-1 transition-all ${inputFocus}`}
+                            placeholder="Doe"
+                        />
+                    </div>
+                </div>
+
+                {/* Username */}
                 <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-1">Full Name</label>
+                    <label className="block text-sm font-medium text-slate-400 mb-1">Username</label>
                     <div className="relative">
                         <input
                             type="text"
+                            value={username}
+                            onChange={e => setUsername(e.target.value)}
                             className={`w-full bg-slate-950 border border-slate-700 rounded-lg pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-1 transition-all ${inputFocus}`}
-                            placeholder="John Doe"
+                            placeholder={isCoach ? 'coach_smith' : 'athlete_doe'}
                         />
                         <User className="absolute left-4 top-3.5 text-slate-500 w-5 h-5" />
                     </div>
                 </div>
 
-                {/* Email */}
-                <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-1">Email Address</label>
-                    <div className="relative">
-                        <input
-                            type="email"
-                            className={`w-full bg-slate-950 border border-slate-700 rounded-lg pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-1 transition-all ${inputFocus}`}
-                            placeholder={isCoach ? "coach@team.com" : "athlete@team.com"}
-                        />
-                        <Mail className="absolute left-4 top-3.5 text-slate-500 w-5 h-5" />
-                    </div>
-                </div>
-
-                {/* Role Selection (This drives the theme!) */}
+                {/* Role Selection */}
                 <div>
                     <label className="block text-sm font-medium text-slate-400 mb-1">Account Type</label>
                     <div className="relative">
@@ -82,22 +129,33 @@ function RegisterContent() {
                     <div className="relative">
                         <input
                             type="password"
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
                             className={`w-full bg-slate-950 border border-slate-700 rounded-lg pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-1 transition-all ${inputFocus}`}
-                            placeholder="********"
+                            placeholder="Min. 6 characters"
                         />
                         <Lock className="absolute left-4 top-3.5 text-slate-500 w-5 h-5" />
                     </div>
                 </div>
 
-                <Link href={backLink} className="block mt-8">
-                    <button type="button" className={`w-full py-3 text-black font-bold rounded-lg transition-colors duration-300 ${buttonBg}`}>
-                        Register
-                    </button>
-                </Link>
+                {error && (
+                    <p className="text-red-400 text-sm">{error}</p>
+                )}
+
+                <button
+                    type="submit"
+                    disabled={submitting}
+                    className={`w-full py-3 text-black font-bold rounded-lg transition-colors duration-300 disabled:opacity-50 mt-8 ${buttonBg}`}
+                >
+                    {submitting ? 'Creating Account…' : 'Register'}
+                </button>
             </form>
 
             <div className="mt-6 text-center text-sm text-slate-500">
-                Already have an account? <Link href={backLink} className={`${linkText} hover:underline transition-colors`}>Sign in</Link>
+                Already have an account?{' '}
+                <Link href={backLink} className={`${linkText} hover:underline transition-colors`}>
+                    Sign in
+                </Link>
             </div>
         </div>
     );
@@ -106,7 +164,6 @@ function RegisterContent() {
 export default function RegisterPage() {
     return (
         <main className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white relative">
-            {/* Universal Back Button */}
             <Link href="/login" className="absolute top-8 left-8 text-slate-500 hover:text-white flex items-center gap-2 transition-colors">
                 <ArrowLeft size={20} />
                 <span>Back to Roles</span>
