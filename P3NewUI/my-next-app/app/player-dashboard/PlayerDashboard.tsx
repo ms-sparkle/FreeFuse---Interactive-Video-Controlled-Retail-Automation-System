@@ -120,7 +120,7 @@ export default function PlayerDashboard() {
       .finally(() => setLoading(false));
 
     fetch('/api/exercises')
-      .then(r => r.json())
+      .then(r => r.ok ? r.json() : { exercises: [] })
       .then(d => {
         setExercises(d.exercises ?? []);
         if (d.exercises?.length > 0) setWorkoutId(d.exercises[0].ExerciseID);
@@ -482,7 +482,7 @@ export default function PlayerDashboard() {
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-slate-400 text-xs">Date of Birth</label>
-                    <input type="date" className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500" value={form.dateOfBirth} onChange={e => setForm({ ...form, dateOfBirth: e.target.value })} />
+                    <input type="date" className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500" value={form.dateOfBirth ?? ''} onChange={e => setForm({ ...form, dateOfBirth: e.target.value })} />
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-slate-400 text-xs">Sex</label>

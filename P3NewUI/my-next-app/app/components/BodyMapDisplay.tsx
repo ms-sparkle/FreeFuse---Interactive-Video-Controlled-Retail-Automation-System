@@ -51,6 +51,10 @@ export default function BodyMapDisplay({
   for (const row of sorenessRows) {
     const slug = dbToSlug(row.BodyPartName, row.Side);
     sorenessMap[slug] = row.SorenessLevel;
+    if (!row.Side || row.Side === 'N/A') {
+      sorenessMap[`${slug}_left`] = row.SorenessLevel;
+      sorenessMap[`${slug}_right`] = row.SorenessLevel;
+    }
   }
 
   const showTooltip = (slug: string, e: React.MouseEvent) => {
