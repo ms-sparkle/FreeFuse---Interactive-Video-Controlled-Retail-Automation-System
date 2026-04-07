@@ -1,13 +1,30 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Activity, AlertTriangle, CalendarDays, Dumbbell, LogOut, Settings, ShieldCheck, Target, TrendingUp, User, CheckCircle2 } from 'lucide-react';
+import {
+  Activity, AlertTriangle, CalendarDays, Dumbbell, LogOut,
+  Settings, ShieldCheck, Target, TrendingUp, User, CheckCircle2,
+} from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import BodyMapDisplay from '../components/BodyMapDisplay';
 
+import BodyMapDisplay from '../components/BodyMapDisplay';
+import SearchBar from '../components/SearchBar';
+
+// ================= TYPES =================
 type Tab = 'workout' | 'soreness' | 'history' | 'profile';
 
-type SessionHistoryRow = { SessionDate: string; WorkoutName: string; Notes: string };
+type Exercise = {
+  ExerciseID: number;
+  Name: string;
+  TargetMuscle: string;
+};
+
+type Coach = {
+  PersonID: number;
+  FirstName: string;
+  LastName: string;
+  Email: string;
+};
 
 type PlayerData = {
   player: {
@@ -23,33 +40,28 @@ type PlayerData = {
     HoursSpentWorkingOut: number;
   };
   coaches: Coach[];
-  latestReport: { ProgressScore: number; InjuryRiskScore: number; ReportDate: string } | null;
-  sorenessEntries: { BodyPartName: string; Side: string; SorenessLevel: number }[];
-  workoutSuggestions: { WorkoutName: string; Duration: number; Reps: number; BodyPartName: string }[];
-  sessions: { SessionDate: string; WorkoutName: string; Notes: string }[];
+  latestReport: {
+    ProgressScore: number;
+    InjuryRiskScore: number;
+    ReportDate: string;
+  } | null;
+  sorenessEntries: {
+    BodyPartName: string;
+    Side: string;
+    SorenessLevel: number;
+  }[];
+  workoutSuggestions: {
+    WorkoutName: string;
+    Duration: number;
+    Reps: number;
+    BodyPartName: string;
+  }[];
+  sessions: {
+    SessionDate: string;
+    WorkoutName: string;
+    Notes: string;
+  }[];
 };
-
-type Coach = {
-  PersonID: number;
-  FirstName: string;
-  LastName: string;
-  Email: string;
-};
-
-type SorenessHistoryRow = {
-  ReportDate: string;
-  BodyPartName: string;
-  Side: string;
-  SorenessLevel: number;
-};
-
-function calcAge(dob: string): number {
-  const birth = new Date(dob);
-  const today = new Date();
-  let age = today.getFullYear() - birth.getFullYear();
-  if (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate())) age--;
-  return age;
-}
 
 type ProfileForm = {
   firstName: string;
@@ -63,57 +75,190 @@ type ProfileForm = {
   hoursSpentWorkingOut: number;
 };
 
+type SorenessHistoryRow = {
+  ReportDate: string;
+  BodyPartName: string;
+  Side: string;
+  SorenessLevel: number;
+};
+
+type SessionHistoryRow = { SessionDate: string; WorkoutName: string; Notes: string };
+
+function calcAge(dob: string): number {
+  const birth = new Date(dob);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  if (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate())) age--;
+  return age;
+}
 
 export default function PlayerDashboard() {
   const router = useRouter();
+
   const [data, setData] = useState<PlayerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('workout');
+
+  // Profile editing state
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [form, setForm] = useState<ProfileForm | null>(null);
+
+  // Coach invite state
   const [inviteCoachValue, setInviteCoachValue] = useState('');
   const [showInviteSuccess, setShowInviteSuccess] = useState(false);
+
+  // Change password state
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  // Workout logger state
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [notes, setNotes] = useState('');
+  const [workoutId, setWorkoutId] = useState<number | null>(null);
+
+  // Soreness history state
   const [sorenessHistory, setSorenessHistory] = useState<SorenessHistoryRow[]>([]);
   const [sorenessSubTab, setSorenessSubTab] = useState<'current' | 'history'>('current');
+
+  // Session history + calendar state
   const [sessionHistory, setSessionHistory] = useState<SessionHistoryRow[]>([]);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
-  const [calendarOffset, setCalendarOffset] = useState(0); // months back from today
+  const [calendarOffset, setCalendarOffset] = useState(0);
 
-  const handleInviteCoachUI = () => {
-      if (!inviteCoachValue) return;
-
-      // 1. Clear the text field
-      setInviteCoachValue('');
-
-      // 2. Show the confirmation message
-      setShowInviteSuccess(true);
-
-      // 3. Hide the message after 3 seconds
-      setTimeout(() => {
-        setShowInviteSuccess(false);
-      }, 3000);
+  // ================= LOGOUT =================
+  const logout = async () => {
+    localStorage.removeItem('session');
+    await fetch('/api/auth/logout', { method: 'POST' });
+    router.push('/login');
   };
 
+  // ================= LOAD DATA =================
+  useEffect(() => {
+    const raw = localStorage.getItem('session');
+    if (!raw) { router.push('/login'); return; }
+    const session = JSON.parse(raw);
+
+    fetch(`/api/player/${session.personId}`)
+      .then(r => r.json())
+      .then(setData)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+
+    fetch('/api/exercises')
+      .then(r => r.ok ? r.json() : { exercises: [] })
+      .then(d => {
+        setExercises(d.exercises ?? []);
+        if (d.exercises?.length > 0) setWorkoutId(d.exercises[0].ExerciseID);
+      })
+      .catch(console.error);
+
+    fetch(`/api/player/${session.personId}/soreness-history`)
+      .then(r => r.json())
+      .then(d => setSorenessHistory(d.history ?? []))
+      .catch(console.error);
+
+    fetch(`/api/player/${session.personId}/session-history`)
+      .then(r => r.json())
+      .then(d => setSessionHistory(d.sessions ?? []))
+      .catch(console.error);
+  }, [router]);
+
+  // ================= LOG WORKOUT =================
+  const logWorkout = async () => {
+    try {
+      const raw = localStorage.getItem('session');
+      if (!raw || !workoutId) return;
+      const session = JSON.parse(raw);
+
+      const res = await fetch('/api/workout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ athleteId: session.personId, workoutId, notes }),
+      });
+      if (!res.ok) throw new Error();
+      setNotes('');
+      alert('Workout logged!');
+      const updated = await fetch(`/api/player/${session.personId}`).then(r => r.json());
+      setData(updated);
+    } catch {
+      alert('Failed to log workout.');
+    }
+  };
+
+  // ================= INVITE COACH =================
+  const handleInviteCoachUI = async () => {
+    if (!inviteCoachValue) return;
+    try {
+      const res = await fetch('/api/player/invite-coach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: inviteCoachValue }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        alert(json.error ?? 'Failed to invite coach');
+        return;
+      }
+      setInviteCoachValue('');
+      setShowInviteSuccess(true);
+      setTimeout(() => setShowInviteSuccess(false), 3000);
+      const raw = localStorage.getItem('session');
+      if (raw) {
+        const session = JSON.parse(raw);
+        const updated = await fetch(`/api/player/${session.personId}`).then(r => r.json());
+        setData(updated);
+      }
+    } catch {
+      alert('Network error. Please try again.');
+    }
+  };
+
+  // ================= CHANGE PASSWORD =================
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess(false);
+    setSavingPassword(true);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setPasswordError(json.error ?? 'Failed to change password');
+      } else {
+        setPasswordSuccess(true);
+        setCurrentPassword('');
+        setNewPassword('');
+        setTimeout(() => { setShowPasswordModal(false); setPasswordSuccess(false); }, 1500);
+      }
+    } catch {
+      setPasswordError('Network error. Please try again.');
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
+  // ================= REMOVE COACH =================
   const handleRemoveCoach = async (coachId: number) => {
-    if (!confirm("Remove this coach from your roster?")) return;
+    if (!confirm('Remove this coach from your roster?')) return;
     try {
       await fetch(`/api/player/remove-coach/${coachId}`, { method: 'DELETE' });
-      setData(prev => prev ? {
-        ...prev,
-        coaches: prev.coaches.filter(c => c.PersonID !== coachId)
-      } : null);
+      setData(prev => prev ? { ...prev, coaches: prev.coaches.filter(c => c.PersonID !== coachId) } : null);
     } catch (err) {
       console.error(err);
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('session');
-    router.push('/login');
-  };
-
+  // ================= PROFILE EDITING =================
   const startEditing = () => {
     if (!data) return;
     setForm({
@@ -131,16 +276,12 @@ export default function PlayerDashboard() {
     setEditing(true);
   };
 
-  const cancelEditing = () => {
-    setEditing(false);
-    setForm(null);
-    setSaveError(null);
-  };
+  const cancelEditing = () => { setEditing(false); setForm(null); setSaveError(null); };
 
   const saveProfile = async () => {
     if (!form) return;
     const raw = localStorage.getItem('session');
-    if (!raw) return;
+    if (!raw) { router.push('/login'); return; }
     const session = JSON.parse(raw);
     setSaving(true);
     setSaveError(null);
@@ -151,7 +292,6 @@ export default function PlayerDashboard() {
         body: JSON.stringify(form),
       });
       if (!res.ok) throw new Error('Save failed');
-      // Re-fetch fresh data
       const updated = await fetch(`/api/player/${session.personId}`).then(r => r.json());
       setData(updated);
       setEditing(false);
@@ -162,27 +302,6 @@ export default function PlayerDashboard() {
       setSaving(false);
     }
   };
-
-  useEffect(() => {
-    const raw = localStorage.getItem('session');
-    if (!raw) return;
-    const session = JSON.parse(raw);
-    fetch(`/api/player/${session.personId}`)
-      .then(r => r.json())
-      .then(setData)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-
-    fetch(`/api/player/${session.personId}/soreness-history`)
-      .then(r => r.json())
-      .then(d => setSorenessHistory(d.history ?? []))
-      .catch(console.error);
-
-    fetch(`/api/player/${session.personId}/session-history`)
-      .then(r => r.json())
-      .then(d => setSessionHistory(d.sessions ?? []))
-      .catch(console.error);
-  }, []);
 
   if (loading) {
     return (
@@ -203,7 +322,7 @@ export default function PlayerDashboard() {
   const { player, latestReport, sorenessEntries, workoutSuggestions, sessions } = data;
   const atRisk = (latestReport?.InjuryRiskScore ?? 0) > 0;
 
-  // Build chart-friendly data: pivot soreness history by date
+  // ── Soreness history chart data ──
   const REGION_COLORS = ['#06b6d4', '#f59e0b', '#a78bfa', '#34d399', '#f87171', '#60a5fa', '#fb923c'];
   const sorenessRegions = Array.from(
     new Set(sorenessHistory.map(r => r.Side !== 'N/A' ? `${r.BodyPartName} (${r.Side})` : r.BodyPartName))
@@ -221,29 +340,34 @@ export default function PlayerDashboard() {
     return point;
   });
 
-  const chartData = [...sessions].reverse().map(s => ({
-    day: s.SessionDate,
-    workout: s.WorkoutName,
-  }));
+  // ── Recent sessions chart data ──
+  const chartData = [...sessions].reverse().map(s => ({ day: s.SessionDate, workout: s.WorkoutName }));
 
-  // Build a set of dates with sessions for the calendar
+  // ── Calendar lookups ──
   const sessionDateSet = new Set(sessionHistory.map(s => s.SessionDate));
-  // Group sessions by date for hover details
   const sessionsByDate: Record<string, SessionHistoryRow[]> = {};
   sessionHistory.forEach(s => {
     if (!sessionsByDate[s.SessionDate]) sessionsByDate[s.SessionDate] = [];
     sessionsByDate[s.SessionDate].push(s);
+  });
+  const sorenessHistoryByDate: Record<string, SorenessHistoryRow[]> = {};
+  sorenessHistory.forEach(r => {
+    if (!sorenessHistoryByDate[r.ReportDate]) sorenessHistoryByDate[r.ReportDate] = [];
+    sorenessHistoryByDate[r.ReportDate].push(r);
   });
 
   const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const DAY_LABELS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: 'workout', label: 'Workout', icon: <Dumbbell size={16} /> },
-    { id: 'soreness', label: 'Soreness', icon: <Activity size={16} /> },
-    { id: 'history', label: 'History', icon: <CalendarDays size={16} /> },
-    { id: 'profile', label: 'Profile & Settings', icon: <User size={16} /> },
+    { id: 'workout',  label: 'Workout',           icon: <Dumbbell size={16} /> },
+    { id: 'soreness', label: 'Soreness',           icon: <Activity size={16} /> },
+    { id: 'history',  label: 'History',            icon: <CalendarDays size={16} /> },
+    { id: 'profile',  label: 'Profile & Settings', icon: <User size={16} /> },
   ];
+
+  // suppress unused warning — calcAge is available for use in profile display if needed
+  void calcAge;
 
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col">
@@ -261,7 +385,8 @@ export default function PlayerDashboard() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Recovery status badge */}
+            <div className="hidden md:block w-64"><SearchBar /></div>
+
             <span className={`hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border
               ${atRisk
                 ? 'bg-red-950/50 border-red-700 text-red-300'
@@ -304,6 +429,7 @@ export default function PlayerDashboard() {
         {/* ══ WORKOUT TAB ══ */}
         {activeTab === 'workout' && (
           <div className="space-y-6">
+
             {/* Injury risk banner */}
             <div className={`rounded-xl border px-4 py-4 ${atRisk ? 'border-red-800/60 bg-red-950/30' : 'border-emerald-800/60 bg-emerald-950/30'}`}>
               <div className={`flex items-center gap-2 font-semibold ${atRisk ? 'text-red-300' : 'text-emerald-300'}`}>
@@ -324,7 +450,38 @@ export default function PlayerDashboard() {
               )}
             </div>
 
-            {/* Workout recommendations */}
+            {/* Log Workout */}
+            <section className="bg-slate-900 p-4 rounded-xl border border-slate-800">
+              <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                <Dumbbell size={18} className="text-cyan-400" /> Log Workout
+              </h2>
+              {exercises.length === 0 ? (
+                <p className="text-slate-500 text-sm">No exercises available.</p>
+              ) : (
+                <div className="flex gap-3">
+                  <select
+                    value={workoutId ?? ''}
+                    onChange={(e) => setWorkoutId(Number(e.target.value))}
+                    className="bg-slate-800 border border-slate-700 p-2 rounded-lg text-white text-sm"
+                  >
+                    {exercises.map(e => (
+                      <option key={e.ExerciseID} value={e.ExerciseID}>{e.Name} ({e.TargetMuscle})</option>
+                    ))}
+                  </select>
+                  <input
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Notes..."
+                    className="bg-slate-800 border border-slate-700 p-2 rounded-lg flex-1 text-sm text-white"
+                  />
+                  <button onClick={logWorkout} className="bg-cyan-500 hover:bg-cyan-400 px-4 py-2 rounded-lg text-black font-semibold text-sm transition-colors">
+                    Log
+                  </button>
+                </div>
+              )}
+            </section>
+
+            {/* Workout Recommendations */}
             <section>
               <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-4">
                 <Dumbbell size={18} />
@@ -352,7 +509,7 @@ export default function PlayerDashboard() {
               </div>
             </section>
 
-            {/* Recent sessions */}
+            {/* Recent Sessions */}
             <section>
               <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-4">
                 <TrendingUp size={18} />
@@ -377,7 +534,10 @@ export default function PlayerDashboard() {
                     {sessions.map((s, i) => (
                       <div key={i} className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm">
                         <span className="font-medium">{s.WorkoutName}</span>
-                        <span className="text-slate-400">{s.SessionDate}</span>
+                        <div className="flex items-center gap-4">
+                          {s.Notes && <span className="text-slate-500 hidden md:block">{s.Notes}</span>}
+                          <span className="text-slate-400">{s.SessionDate}</span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -411,15 +571,14 @@ export default function PlayerDashboard() {
         {/* ══ SORENESS TAB ══ */}
         {activeTab === 'soreness' && (
           <div className="space-y-6">
-            {/* Sub-tab header row */}
+
+            {/* Sub-tab header */}
             <div className="flex items-center justify-between">
               <div className="flex gap-1 rounded-lg border border-slate-800 bg-slate-900 p-1">
                 <button
                   onClick={() => setSorenessSubTab('current')}
                   className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    sorenessSubTab === 'current'
-                      ? 'bg-cyan-500 text-black'
-                      : 'text-slate-400 hover:text-white'
+                    sorenessSubTab === 'current' ? 'bg-cyan-500 text-black' : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   Current
@@ -427,9 +586,7 @@ export default function PlayerDashboard() {
                 <button
                   onClick={() => setSorenessSubTab('history')}
                   className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    sorenessSubTab === 'history'
-                      ? 'bg-cyan-500 text-black'
-                      : 'text-slate-400 hover:text-white'
+                    sorenessSubTab === 'history' ? 'bg-cyan-500 text-black' : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   History
@@ -440,10 +597,12 @@ export default function PlayerDashboard() {
               </a>
             </div>
 
-            {/* ── Current sub-tab ── */}
+            {/* Current sub-tab */}
             {sorenessSubTab === 'current' && (
               <div className="space-y-4">
-                <p className="text-slate-400 text-sm">From your most recent check-in{latestReport ? ` on ${latestReport.ReportDate}` : ''}</p>
+                <p className="text-slate-400 text-sm">
+                  From your most recent check-in{latestReport ? ` on ${latestReport.ReportDate}` : ''}
+                </p>
                 {sorenessEntries.length === 0 ? (
                   <div className="rounded-xl border border-slate-800 bg-slate-900 p-10 text-center">
                     <Activity className="w-10 h-10 text-slate-600 mx-auto mb-3" />
@@ -451,36 +610,39 @@ export default function PlayerDashboard() {
                     <p className="text-slate-500 text-sm mt-1">Complete a check-in to see your soreness data here.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {sorenessEntries.map((entry, i) => {
-                      const level = entry.SorenessLevel;
-                      const color = level >= 7 ? 'border-red-700 bg-red-950/30 text-red-300'
-                        : level >= 4 ? 'border-yellow-700 bg-yellow-950/30 text-yellow-300'
-                        : 'border-emerald-700 bg-emerald-950/30 text-emerald-300';
-                      const bar = level >= 7 ? 'bg-red-500' : level >= 4 ? 'bg-yellow-500' : 'bg-emerald-500';
-                      return (
-                        <div key={i} className={`rounded-xl border p-4 ${color}`}>
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="font-semibold text-white">
-                              {entry.BodyPartName}{entry.Side !== 'N/A' ? ` (${entry.Side})` : ''}
-                            </span>
-                            <span className="text-lg font-bold">{level}<span className="text-sm font-normal text-slate-400">/10</span></span>
+                  <>
+                    <BodyMapDisplay sorenessRows={sorenessEntries} sex={player.Sex} />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                      {sorenessEntries.map((entry, i) => {
+                        const level = entry.SorenessLevel;
+                        const color = level >= 7 ? 'border-red-700 bg-red-950/30 text-red-300'
+                          : level >= 4 ? 'border-yellow-700 bg-yellow-950/30 text-yellow-300'
+                          : 'border-emerald-700 bg-emerald-950/30 text-emerald-300';
+                        const bar = level >= 7 ? 'bg-red-500' : level >= 4 ? 'bg-yellow-500' : 'bg-emerald-500';
+                        return (
+                          <div key={i} className={`rounded-xl border p-4 ${color}`}>
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="font-semibold text-white">
+                                {entry.BodyPartName}{entry.Side !== 'N/A' ? ` (${entry.Side})` : ''}
+                              </span>
+                              <span className="text-lg font-bold">{level}<span className="text-sm font-normal text-slate-400">/10</span></span>
+                            </div>
+                            <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full transition-all ${bar}`} style={{ width: `${level * 10}%` }} />
+                            </div>
+                            <p className="text-xs mt-2 opacity-75">
+                              {level >= 7 ? 'High — avoid loading this area' : level >= 4 ? 'Moderate — train with caution' : 'Low — cleared for normal training'}
+                            </p>
                           </div>
-                          <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full transition-all ${bar}`} style={{ width: `${level * 10}%` }} />
-                          </div>
-                          <p className="text-xs mt-2 opacity-75">
-                            {level >= 7 ? 'High — avoid loading this area' : level >= 4 ? 'Moderate — train with caution' : 'Low — cleared for normal training'}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  </>
                 )}
               </div>
             )}
 
-            {/* ── History sub-tab ── */}
+            {/* History sub-tab */}
             {sorenessSubTab === 'history' && (
               <div className="space-y-4">
                 <p className="text-slate-400 text-sm">Soreness trends across all body regions — last 30 days</p>
@@ -530,19 +692,11 @@ export default function PlayerDashboard() {
           const todayStr = today.toISOString().slice(0, 10);
           const isCurrentMonth = calendarOffset === 0;
 
-          // Show 2 months: calendarOffset+1 (older) and calendarOffset (newer)
           const visibleMonths = [1, 0].map(extra => {
             const d = new Date(today.getFullYear(), today.getMonth() - calendarOffset - extra, 1);
             return { year: d.getFullYear(), monthIdx: d.getMonth() };
           });
           const newerMonth = visibleMonths[1];
-
-          // Build soreness lookup by date
-          const sorenessHistoryByDate: Record<string, SorenessHistoryRow[]> = {};
-          sorenessHistory.forEach(r => {
-            if (!sorenessHistoryByDate[r.ReportDate]) sorenessHistoryByDate[r.ReportDate] = [];
-            sorenessHistoryByDate[r.ReportDate].push(r);
-          });
 
           const selectedSessions = selectedCalendarDate ? (sessionsByDate[selectedCalendarDate] ?? []) : [];
           const selectedSoreness = selectedCalendarDate ? (sorenessHistoryByDate[selectedCalendarDate] ?? []) : [];
@@ -561,121 +715,124 @@ export default function PlayerDashboard() {
               </div>
 
               <div className="flex gap-4 items-start">
-              <div className="flex flex-col gap-4 w-2/3">
-                {/* Date scrubbing controls */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <select
-                    value={newerMonth.monthIdx}
-                    onChange={e => {
-                      const targetMonth = Number(e.target.value);
-                      const diff = (today.getFullYear() - newerMonth.year) * 12 + (today.getMonth() - targetMonth);
-                      setCalendarOffset(Math.max(0, diff));
-                      setSelectedCalendarDate(null);
-                    }}
-                    className="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-cyan-500"
-                  >
-                    {MONTH_NAMES.map((m, i) => (
-                      <option key={i} value={i}>{m}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={newerMonth.year}
-                    onChange={e => {
-                      const targetYear = Number(e.target.value);
-                      const diff = (targetYear - today.getFullYear()) * -12 + (today.getMonth() - newerMonth.monthIdx);
-                      setCalendarOffset(Math.max(0, diff));
-                      setSelectedCalendarDate(null);
-                    }}
-                    className="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-cyan-500"
-                  >
-                    {Array.from({ length: 5 }, (_, i) => today.getFullYear() - i).map(y => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
-                  <div className="w-px h-5 bg-slate-700" />
-                  <button
-                    onClick={() => { setCalendarOffset(o => o + 1); setSelectedCalendarDate(null); }}
-                    className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors text-xs"
-                  >
-                    ← Prev
-                  </button>
-                  <button
-                    onClick={() => { setCalendarOffset(o => Math.max(0, o - 1)); setSelectedCalendarDate(null); }}
-                    disabled={isCurrentMonth}
-                    className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors text-xs disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    Next →
-                  </button>
-                  <button
-                    onClick={() => { setCalendarOffset(0); setSelectedCalendarDate(null); }}
-                    disabled={isCurrentMonth}
-                    className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition-colors text-xs disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    Today
-                  </button>
+                <div className="flex flex-col gap-4 w-2/3">
+
+                  {/* Navigation controls */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select
+                      value={newerMonth.monthIdx}
+                      onChange={e => {
+                        const targetMonth = Number(e.target.value);
+                        const diff = (today.getFullYear() - newerMonth.year) * 12 + (today.getMonth() - targetMonth);
+                        setCalendarOffset(Math.max(0, diff));
+                        setSelectedCalendarDate(null);
+                      }}
+                      className="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-cyan-500"
+                    >
+                      {MONTH_NAMES.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                    </select>
+                    <select
+                      value={newerMonth.year}
+                      onChange={e => {
+                        const targetYear = Number(e.target.value);
+                        const diff = (targetYear - today.getFullYear()) * -12 + (today.getMonth() - newerMonth.monthIdx);
+                        setCalendarOffset(Math.max(0, diff));
+                        setSelectedCalendarDate(null);
+                      }}
+                      className="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-cyan-500"
+                    >
+                      {Array.from({ length: 5 }, (_, i) => today.getFullYear() - i).map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                    <div className="w-px h-5 bg-slate-700" />
+                    <button
+                      onClick={() => { setCalendarOffset(o => o + 1); setSelectedCalendarDate(null); }}
+                      className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors text-xs"
+                    >
+                      ← Prev
+                    </button>
+                    <button
+                      onClick={() => { setCalendarOffset(o => Math.max(0, o - 1)); setSelectedCalendarDate(null); }}
+                      disabled={isCurrentMonth}
+                      className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors text-xs disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      Next →
+                    </button>
+                    <button
+                      onClick={() => { setCalendarOffset(0); setSelectedCalendarDate(null); }}
+                      disabled={isCurrentMonth}
+                      className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition-colors text-xs disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      Today
+                    </button>
+                  </div>
+
+                  {/* Two-month grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {visibleMonths.map(({ year, monthIdx }) => {
+                      const firstDay = new Date(year, monthIdx, 1).getDay();
+                      const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+                      const cells: (number | null)[] = [
+                        ...Array(firstDay).fill(null),
+                        ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+                      ];
+                      return (
+                        <div key={`${year}-${monthIdx}`} className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+                          <p className="text-sm font-semibold text-slate-300 mb-3">
+                            {MONTH_NAMES[monthIdx]} <span className="text-slate-500 font-normal">{year}</span>
+                          </p>
+                          <div className="grid grid-cols-7 gap-0.5 text-center">
+                            {DAY_LABELS.map(d => (
+                              <div key={d} className="text-slate-600 text-[10px] pb-1">{d}</div>
+                            ))}
+                            {cells.map((day, ci) => {
+                              if (!day) return <div key={ci} />;
+                              const dateStr = `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                              const hasSession = sessionDateSet.has(dateStr);
+                              const isToday = dateStr === todayStr;
+                              const isSelected = dateStr === selectedCalendarDate;
+                              const daySoreness = sorenessHistoryByDate[dateStr];
+                              const maxSoreness = daySoreness ? Math.max(...daySoreness.map(r => r.SorenessLevel)) : 0;
+                              const sorenessColor = maxSoreness >= 7 ? 'bg-red-500' : maxSoreness >= 4 ? 'bg-yellow-400' : maxSoreness > 0 ? 'bg-green-400' : '';
+                              return (
+                                <button
+                                  key={ci}
+                                  onClick={() => setSelectedCalendarDate(isSelected ? null : dateStr)}
+                                  className={`relative flex flex-col items-center justify-center rounded text-[11px] h-7 w-full transition-colors
+                                    ${isSelected ? 'ring-2 ring-white' : isToday ? 'ring-1 ring-cyan-500' : ''}
+                                    ${hasSession
+                                      ? 'bg-cyan-500 text-black font-semibold hover:bg-cyan-400'
+                                      : 'text-slate-500 hover:bg-slate-800'
+                                    }`}
+                                >
+                                  <span className="leading-none relative -top-[3px]">{day}</span>
+                                  {maxSoreness > 0 && (
+                                    <span className={`absolute bottom-[3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full ring-1 ring-black/60 ${sorenessColor}`} />
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <p className="text-slate-500 text-xs text-center">
+                    {!selectedCalendarDate
+                      ? 'Select a day to view details'
+                      : selectedSoreness.length === 0
+                      ? 'No soreness logged for this day'
+                      : null}
+                  </p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {visibleMonths.map(({ year, monthIdx }) => {
-                  const firstDay = new Date(year, monthIdx, 1).getDay();
-                  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
-                  const cells: (number | null)[] = [
-                    ...Array(firstDay).fill(null),
-                    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-                  ];
-                  return (
-                    <div key={`${year}-${monthIdx}`} className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-                      <p className="text-sm font-semibold text-slate-300 mb-3">
-                        {MONTH_NAMES[monthIdx]} <span className="text-slate-500 font-normal">{year}</span>
-                      </p>
-                      <div className="grid grid-cols-7 gap-0.5 text-center">
-                        {DAY_LABELS.map(d => (
-                          <div key={d} className="text-slate-600 text-[10px] pb-1">{d}</div>
-                        ))}
-                        {cells.map((day, ci) => {
-                          if (!day) return <div key={ci} />;
-                          const dateStr = `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                          const hasSession = sessionDateSet.has(dateStr);
-                          const isToday = dateStr === todayStr;
-                          const isSelected = dateStr === selectedCalendarDate;
-                          const daySoreness = sorenessHistoryByDate[dateStr];
-                          const maxSoreness = daySoreness ? Math.max(...daySoreness.map(r => r.SorenessLevel)) : 0;
-                          const sorenessColor = maxSoreness >= 7 ? 'bg-red-500' : maxSoreness >= 4 ? 'bg-yellow-400' : maxSoreness > 0 ? 'bg-green-400' : '';
-                          return (
-                            <button
-                              key={ci}
-                              onClick={() => setSelectedCalendarDate(isSelected ? null : dateStr)}
-                              className={`relative flex flex-col items-center justify-center rounded text-[11px] h-7 w-full transition-colors
-                                ${isSelected ? 'ring-2 ring-white' : isToday ? 'ring-1 ring-cyan-500' : ''}
-                                ${hasSession
-                                  ? 'bg-cyan-500 text-black font-semibold hover:bg-cyan-400'
-                                  : 'text-slate-500 hover:bg-slate-800'
-                                }`}
-                            >
-                              <span className="leading-none relative -top-[3px]">{day}</span>
-                              {maxSoreness > 0 && (
-                                <span className={`absolute bottom-[3px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full ring-1 ring-black/60 ${sorenessColor}`} />
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-                <p className="text-slate-500 text-xs text-center">
-                  {!selectedCalendarDate
-                    ? 'Select a day to highlight soreness'
-                    : selectedSoreness.length === 0
-                    ? 'No soreness logged for this day'
-                    : null}
-                </p>
-              </div>
-              {/* Body map beside calendars */}
-              <div className="shrink-0 flex flex-col items-center gap-2">
-                <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wide text-center w-full">Soreness Map</p>
-                <BodyMapDisplay sorenessRows={selectedSoreness} sex={player.Sex} scale={0.85} />
-              </div>
+
+                {/* Body map beside calendars */}
+                <div className="shrink-0 flex flex-col items-center gap-2">
+                  <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wide text-center w-full">Soreness Map</p>
+                  <BodyMapDisplay sorenessRows={selectedSoreness} sex={player.Sex} scale={0.85} />
+                </div>
               </div>
 
               {/* Legend */}
@@ -684,7 +841,7 @@ export default function PlayerDashboard() {
                 <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded ring-1 ring-cyan-500" /> Today</span>
                 <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded ring-2 ring-white" /> Selected</span>
                 <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-green-400" /> Low soreness (1–3)</span>
-                <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-yellow-400" /> Moderate soreness (4–6)</span>
+                <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-yellow-400" /> Moderate (4–6)</span>
                 <span className="flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-red-500" /> High soreness (7–10)</span>
               </div>
 
@@ -701,7 +858,6 @@ export default function PlayerDashboard() {
                     </button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-[7fr_3fr] gap-6">
-                    {/* Workouts */}
                     <div>
                       <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wide mb-2">Workouts</p>
                       {selectedSessions.length === 0 ? (
@@ -717,7 +873,6 @@ export default function PlayerDashboard() {
                         </ul>
                       )}
                     </div>
-                    {/* Soreness */}
                     <div>
                       <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wide mb-2">Soreness</p>
                       {selectedSoreness.length === 0 ? (
@@ -747,43 +902,27 @@ export default function PlayerDashboard() {
         {/* ══ PROFILE & SETTINGS TAB ══ */}
         {activeTab === 'profile' && (
           <div className="space-y-6 max-w-2xl">
+
             {/* Personal Info */}
             <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
               <div className="flex items-center justify-between mb-5">
                 <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300">
-                  <User size={18} />
-                  Personal Information
+                  <User size={18} /> Personal Information
                 </h2>
                 {!editing ? (
-                  <button
-                    onClick={startEditing}
-                    className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors text-xs"
-                  >
+                  <button onClick={startEditing} className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors text-xs">
                     Edit
                   </button>
                 ) : (
                   <div className="flex gap-2">
-                    <button
-                      onClick={cancelEditing}
-                      className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-400 hover:text-white transition-colors text-xs"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={saveProfile}
-                      disabled={saving}
-                      className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black font-semibold transition-colors text-xs"
-                    >
+                    <button onClick={cancelEditing} className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-400 hover:text-white transition-colors text-xs">Cancel</button>
+                    <button onClick={saveProfile} disabled={saving} className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black font-semibold transition-colors text-xs">
                       {saving ? 'Saving…' : 'Save'}
                     </button>
                   </div>
                 )}
               </div>
-
-              {saveError && (
-                <p className="text-red-400 text-xs mb-4">{saveError}</p>
-              )}
-
+              {saveError && <p className="text-red-400 text-xs mb-4">{saveError}</p>}
               {!editing ? (
                 <div className="grid grid-cols-2 gap-y-4 text-sm">
                   <span className="text-slate-400">First Name</span><span>{player.FirstName}</span>
@@ -800,36 +939,19 @@ export default function PlayerDashboard() {
                 <div className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
                   <div className="flex flex-col gap-1">
                     <label className="text-slate-400 text-xs">First Name</label>
-                    <input
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.firstName}
-                      onChange={e => setForm({ ...form, firstName: e.target.value })}
-                    />
+                    <input className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-slate-400 text-xs">Last Name</label>
-                    <input
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.lastName}
-                      onChange={e => setForm({ ...form, lastName: e.target.value })}
-                    />
+                    <input className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-slate-400 text-xs">Date of Birth</label>
-                    <input
-                      type="date"
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.dateOfBirth}
-                      onChange={e => setForm({ ...form, dateOfBirth: e.target.value })}
-                    />
+                    <input type="date" className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500" value={form.dateOfBirth ?? ''} onChange={e => setForm({ ...form, dateOfBirth: e.target.value })} />
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-slate-400 text-xs">Sex</label>
-                    <select
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.sex}
-                      onChange={e => setForm({ ...form, sex: e.target.value })}
-                    >
+                    <select className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500" value={form.sex} onChange={e => setForm({ ...form, sex: e.target.value })}>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
                       <option value="Other">Other</option>
@@ -837,74 +959,44 @@ export default function PlayerDashboard() {
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-slate-400 text-xs">Height (inches)</label>
-                    <input
-                      type="number"
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.height}
-                      onChange={e => setForm({ ...form, height: Number(e.target.value) })}
-                    />
+                    <input type="number" className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500" value={form.height} onChange={e => setForm({ ...form, height: Number(e.target.value) })} />
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-slate-400 text-xs">Weight (lbs)</label>
-                    <input
-                      type="number"
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.weight}
-                      onChange={e => setForm({ ...form, weight: Number(e.target.value) })}
-                    />
+                    <input type="number" className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500" value={form.weight} onChange={e => setForm({ ...form, weight: Number(e.target.value) })} />
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-slate-400 text-xs">Sport</label>
-                    <input
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.sportPlayed}
-                      onChange={e => setForm({ ...form, sportPlayed: e.target.value })}
-                    />
+                    <input className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500" value={form.sportPlayed} onChange={e => setForm({ ...form, sportPlayed: e.target.value })} />
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-slate-400 text-xs">Team</label>
-                    <input
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.team}
-                      onChange={e => setForm({ ...form, team: e.target.value })}
-                    />
+                    <input className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500" value={form.team} onChange={e => setForm({ ...form, team: e.target.value })} />
                   </div>
                   <div className="flex flex-col gap-1 col-span-2">
                     <label className="text-slate-400 text-xs">Hours Working Out / Week</label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
-                      value={form.hoursSpentWorkingOut}
-                      onChange={e => setForm({ ...form, hoursSpentWorkingOut: Number(e.target.value) })}
-                    />
+                    <input type="number" step="0.5" className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500" value={form.hoursSpentWorkingOut} onChange={e => setForm({ ...form, hoursSpentWorkingOut: Number(e.target.value) })} />
                   </div>
                 </div>
               )}
             </section>
-            {/* ══ COACH MANAGEMENT ══ */}
-            <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300">
-                  <ShieldCheck size={18} />
-                  My Coaches
-                </h2>
-              </div>
 
-            {/* ── INVITE BOX (UI ONLY) ── */}
+            {/* My Coaches */}
+            <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-5">
+                <ShieldCheck size={18} /> My Coaches
+              </h2>
               <div className="mb-6 p-4 rounded-xl bg-slate-950/50 border border-slate-800">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
-                  Invite New Coach
-                </label>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">Invite New Coach</label>
                 <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    placeholder="Coach username or email..." 
+                  <input
+                    type="text"
+                    placeholder="Coach username or email..."
                     value={inviteCoachValue}
                     onChange={(e) => setInviteCoachValue(e.target.value)}
                     className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-cyan-500 text-white"
                   />
-                  <button 
+                  <button
                     onClick={handleInviteCoachUI}
                     disabled={!inviteCoachValue}
                     className="bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-black px-4 py-2 rounded-lg font-semibold text-sm transition-colors"
@@ -912,53 +1004,45 @@ export default function PlayerDashboard() {
                     Invite
                   </button>
                 </div>
-
-                {/* Confirmation Message */}
                 {showInviteSuccess && (
-                  <div className="mt-3 flex items-center gap-2 text-emerald-400 text-sm font-medium animate-in fade-in slide-in-from-top-1">
-                    <CheckCircle2 size={14} />
-                    Coach invited!
+                  <div className="mt-3 flex items-center gap-2 text-emerald-400 text-sm font-medium">
+                    <CheckCircle2 size={14} /> Coach invited!
                   </div>
                 )}
               </div>
-
-            {/* Coaches List */}
-            <div className="space-y-3">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block px-1">
-                Active Coaches
-              </label>
-              {data.coaches?.length === 0 ? (
-                <p className="text-slate-500 text-sm italic px-1">No coaches assigned to your profile.</p>
-              ) : (
-                data.coaches?.map(coach => (
-                  <div key={coach.PersonID} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/40 border border-slate-800 group hover:border-slate-700 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-xs">
-                        {coach.FirstName[0]}{coach.LastName[0]}
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block px-1">Active Coaches</label>
+                {!data.coaches || data.coaches.length === 0 ? (
+                  <p className="text-slate-500 text-sm italic px-1">No coaches assigned to your profile.</p>
+                ) : (
+                  data.coaches.map(coach => (
+                    <div key={coach.PersonID} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/40 border border-slate-800 hover:border-slate-700 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-xs">
+                          {coach.FirstName[0]}{coach.LastName[0]}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-white">{coach.FirstName} {coach.LastName}</p>
+                          <p className="text-[10px] text-slate-500">{coach.Email}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-white">{coach.FirstName} {coach.LastName}</p>
-                        <p className="text-[10px] text-slate-500">{coach.Email}</p>
-                      </div>
+                      <button
+                        onClick={() => handleRemoveCoach(coach.PersonID)}
+                        className="text-slate-500 hover:text-red-400 p-2 rounded-lg hover:bg-red-400/10 transition-all"
+                        title="Remove Coach"
+                      >
+                        <LogOut size={16} className="rotate-180" />
+                      </button>
                     </div>
-                    <button 
-                      onClick={() => handleRemoveCoach(coach.PersonID)}
-                      className="text-slate-500 hover:text-red-400 p-2 rounded-lg hover:bg-red-400/10 transition-all"
-                      title="Remove Coach"
-                    >
-                      <LogOut size={16} className="rotate-180" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
+                  ))
+                )}
+              </div>
+            </section>
 
             {/* Settings */}
             <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
               <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-5">
-                <Settings size={18} />
-                Settings
+                <Settings size={18} /> Settings
               </h2>
               <div className="space-y-4 text-sm">
                 <div className="flex items-center justify-between py-3 border-b border-slate-800">
@@ -966,7 +1050,10 @@ export default function PlayerDashboard() {
                     <p className="font-medium">Account</p>
                     <p className="text-slate-400 text-xs mt-0.5">Manage your login credentials</p>
                   </div>
-                  <button className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors text-xs">
+                  <button
+                    onClick={() => { setShowPasswordModal(true); setPasswordError(''); setPasswordSuccess(false); }}
+                    className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition-colors text-xs"
+                  >
                     Change Password
                   </button>
                 </div>
@@ -979,8 +1066,7 @@ export default function PlayerDashboard() {
                     onClick={logout}
                     className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-red-800 text-red-400 hover:bg-red-950/50 transition-colors text-xs"
                   >
-                    <LogOut size={13} />
-                    Logout
+                    <LogOut size={13} /> Logout
                   </button>
                 </div>
               </div>
@@ -989,6 +1075,33 @@ export default function PlayerDashboard() {
         )}
 
       </div>
+
+      {/* ══ CHANGE PASSWORD MODAL ══ */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl shadow-2xl p-6">
+            <h2 className="text-lg font-bold mb-4">Change Password</h2>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Current Password</label>
+                <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500" placeholder="Current password" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1">New Password</label>
+                <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-cyan-500" placeholder="New password (min. 6 chars)" />
+              </div>
+              {passwordError && <p className="text-red-400 text-xs">{passwordError}</p>}
+              {passwordSuccess && <p className="text-emerald-400 text-xs">Password updated!</p>}
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={() => setShowPasswordModal(false)} className="flex-1 py-2 rounded-lg border border-slate-700 text-slate-400 hover:text-white transition-colors text-sm">Cancel</button>
+                <button type="submit" disabled={savingPassword} className="flex-1 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black font-semibold transition-colors text-sm">
+                  {savingPassword ? 'Saving…' : 'Update'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

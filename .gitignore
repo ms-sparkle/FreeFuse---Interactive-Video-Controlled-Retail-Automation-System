@@ -2,3 +2,6 @@
 # Ignore IDE-specific folders
 /.vs/
 P3NewUI/my-next-app/data/capstone.db-wal
+P3NewUI/my-next-app/data/capstone.db
+P3NewUI/my-next-app/data/capstone.db-shm
+P3NewUI/my-next-app/data/capstone.db-wal

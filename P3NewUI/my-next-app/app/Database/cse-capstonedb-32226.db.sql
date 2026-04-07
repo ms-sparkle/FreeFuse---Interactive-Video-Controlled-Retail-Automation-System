@@ -80,13 +80,13 @@ CREATE TABLE IF NOT EXISTS "SORENESS_ENTRY" (
     FOREIGN KEY("BodyPartID") REFERENCES "BODYPART"("BodyPartID"),
     FOREIGN KEY("ReportID") REFERENCES "SORENESS_REPORT"("ReportID")
 );
-INSERT INTO "ACCOUNT" ("AccountID","Username","PasswordHash") VALUES (1,'c_smith','p1'),
- (2,'c_jones','p2'),
- (3,'a_davis','p3'),
- (4,'a_miller','p4'),
- (5,'a_wilson','p5'),
- (6,'a_moore','p6'),
- (7,'a_taylor','p7');
+INSERT INTO "ACCOUNT" ("AccountID","Username","PasswordHash") VALUES (1,'c_smith','$2b$10$Go.3..k0/vUZZyhkGde3MeeJwycAsjETJYpmFV2crKzsCtxlQsIFG'),
+ (2,'c_jones','$2b$10$4Xs4YDg5fTy20LoFMvyztOJ60dJ6/ymUvCaiqzxerXdlpls1pEE4e'),
+ (3,'a_davis','$2b$10$89itnJyAnRFw1QXu21AP5uO.8hdVTxvZRS1RjDyn5z4fAe.Tau4oK'),
+ (4,'a_miller','$2b$10$2FvSUmi.lJByfO9EanqAEuHDBRBmfPfItCjeBlRjMnl0Yc99K63mG'),
+ (5,'a_wilson','$2b$10$Pc2M/MKevfAs0RQuMOe9Kua7cHNUD9r1gQRmyy80tf1ynmH68Z72W'),
+ (6,'a_moore','$2b$10$j/ymbu2W5Au8PRcpR8nVzuUXT5Pjf3S3hjfbli/Kgo8M0sANWFkiy'),
+ (7,'a_taylor','$2b$10$4SCZOdqDyP6on8GKWf1VP.7APSiOBTz7xxwbL25lKquE2x2B5hnBW');
 INSERT INTO "ATHLETE" ("PersonID","HoursSpentWorkingOut","SportPlayed","Team", "Sex", "Height", "Weight") VALUES (3,10.5,'Basketball','Lions', 'Male', 74, 210),
  (4,12.0,'Soccer','Eagles', 'Male', 63, 187),
  (5,8.0,'Swimming','Sharks', 'Female', 67, 160),

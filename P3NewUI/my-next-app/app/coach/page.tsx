@@ -127,8 +127,9 @@ export default function CoachDashboard() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [isManagingRoster, setIsManagingRoster] = useState(false);
 
-  const logout = () => {
+  const logout = async () => {
     localStorage.removeItem('session');
+    await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
   };
   const [detail, setDetail] = useState<PlayerDetail | null>(null);
@@ -137,15 +138,17 @@ export default function CoachDashboard() {
 
   // Load roster on mount using session coachId
   useEffect(() => {
-    const raw = localStorage.getItem('session');
-    if (!raw) return;
-    const session = JSON.parse(raw);
-    setCoachName(`${session.firstName} ${session.lastName}`);
-    fetch(`/api/coach/athletes?coachId=${session.personId}`)
-      .then(r => r.json())
-      .then(data => setRoster(data.athletes ?? []))
-      .catch(console.error);
-  }, []);
+    fetch('/api/auth/session')
+      .then(r => r.ok ? r.json() : null)
+      .then(session => {
+        if (!session) { router.push('/login'); return; }
+        setCoachName(`${session.firstName} ${session.lastName}`);
+        return fetch(`/api/coach/athletes?coachId=${session.personId}`)
+          .then(r => r.json())
+          .then(data => setRoster(data.athletes ?? []))
+          .catch(console.error);
+      });
+  }, [router]);
 
   // Load individual athlete detail when selected
   useEffect(() => {
@@ -162,15 +165,19 @@ export default function CoachDashboard() {
 
   const handleRemoveAthlete = async (athleteId: number) => {
     if (!confirm("Are you sure you want to remove this athlete?")) return;
-    
-    // Example API Call
+
     try {
-      const response = await fetch(`/api/coach/remove-athlete`, {
+      const response = await fetch('/api/coach/remove-athlete', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ athleteId }),
       });
       if (response.ok) {
         setRoster(prev => prev.filter(a => a.PersonID !== athleteId));
+        if (selectedId === athleteId) setSelectedId(null);
+      } else {
+        const data = await response.json();
+        alert(data.error ?? 'Failed to remove athlete');
       }
     } catch (err) {
       console.error("Failed to remove athlete", err);
@@ -179,11 +186,30 @@ export default function CoachDashboard() {
 
   const handleInviteAthlete = async (identifier: string) => {
     if (!identifier) return;
-    
-    // Example API Call
-    console.log("Inviting:", identifier);
-    alert(`Invitation sent to ${identifier}!`);
-    // In a real app, you'd fetch the updated roster or show a success toast
+
+    try {
+      const response = await fetch('/api/coach/invite-athlete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: identifier }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        alert(`${data.athleteName} added to your roster!`);
+        // Refresh roster
+        const sessionRes = await fetch('/api/auth/session');
+        if (sessionRes.ok) {
+          const session = await sessionRes.json();
+          const rosterRes = await fetch(`/api/coach/athletes?coachId=${session.personId}`);
+          const rosterData = await rosterRes.json();
+          setRoster(rosterData.athletes ?? []);
+        }
+      } else {
+        alert(data.error ?? 'Failed to invite athlete');
+      }
+    } catch (err) {
+      console.error("Failed to invite athlete", err);
+    }
   };
 
 

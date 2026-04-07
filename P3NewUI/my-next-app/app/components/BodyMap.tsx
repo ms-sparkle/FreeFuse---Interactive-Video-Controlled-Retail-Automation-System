@@ -54,12 +54,13 @@ export default function BodyMap() {
   const [bodyVariant, setBodyVariant] = useState<'female' | 'male'>('male');
 
   useEffect(() => {
-    const raw = localStorage.getItem('session');
-    if (!raw) return;
-    const session = JSON.parse(raw);
-    if (session.sex) {
-      setBodyVariant(session.sex.toLowerCase() === 'male' ? 'male' : 'female');
-    }
+    fetch('/api/auth/session')
+      .then(r => r.ok ? r.json() : null)
+      .then(session => {
+        if (session?.sex) {
+          setBodyVariant(session.sex.toLowerCase() === 'male' ? 'male' : 'female');
+        }
+      });
   }, []);
 
   const [bodySide, setBodySide] = useState<'front' | 'back'>('front');
@@ -90,14 +91,9 @@ export default function BodyMap() {
   };
 
   const submitCheckIn = async () => {
-    if (Object.keys(sorenessData).length === 0) {
-      setSubmitError("Must enter soreness to submit check-in");
-      return;
-    }
-
-    const raw = localStorage.getItem('session');
-    if (!raw) { setSubmitError('Not logged in'); return; }
-    const session = JSON.parse(raw);
+    const sessionRes = await fetch('/api/auth/session');
+    if (!sessionRes.ok) { setSubmitError('Not logged in'); return; }
+    const session = await sessionRes.json();
     setSubmitting(true);
     setSubmitError('');
 
