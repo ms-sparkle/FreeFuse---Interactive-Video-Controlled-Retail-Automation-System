@@ -59,6 +59,7 @@ type PlayerData = {
   sessions: {
     SessionDate: string;
     WorkoutName: string;
+    Duration: number;
     Notes: string;
   }[];
 };
@@ -82,7 +83,7 @@ type SorenessHistoryRow = {
   SorenessLevel: number;
 };
 
-type SessionHistoryRow = { SessionDate: string; WorkoutName: string; Notes: string };
+type SessionHistoryRow = { SessionDate: string; WorkoutName: string; Duration: number; Notes: string };
 
 function calcAge(dob: string): number {
   const birth = new Date(dob);
@@ -124,7 +125,15 @@ export default function PlayerDashboard() {
 
   // Soreness history state
   const [sorenessHistory, setSorenessHistory] = useState<SorenessHistoryRow[]>([]);
-  const [sorenessSubTab, setSorenessSubTab] = useState<'current' | 'history'>('current');
+  const [hiddenLines, setHiddenLines] = useState<Set<string>>(new Set());
+
+  const toggleLine = (region: string) => {
+    setHiddenLines(prev => {
+      const next = new Set(prev);
+      next.has(region) ? next.delete(region) : next.add(region);
+      return next;
+    });
+  };
 
   // Session history + calendar state
   const [sessionHistory, setSessionHistory] = useState<SessionHistoryRow[]>([]);
@@ -341,7 +350,7 @@ export default function PlayerDashboard() {
   });
 
   // ── Recent sessions chart data ──
-  const chartData = [...sessions].reverse().map(s => ({ day: s.SessionDate, workout: s.WorkoutName }));
+  const chartData = [...sessions].reverse().map(s => ({ day: s.SessionDate, workout: s.WorkoutName, duration: s.Duration }));
 
   // ── Calendar lookups ──
   const sessionDateSet = new Set(sessionHistory.map(s => s.SessionDate));
@@ -524,9 +533,17 @@ export default function PlayerDashboard() {
                       <LineChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                         <XAxis dataKey="day" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                        <YAxis hide />
-                        <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }} itemStyle={{ color: '#06b6d4' }} />
-                        <Line type="monotone" dataKey="day" stroke="#06b6d4" strokeWidth={3} dot={{ r: 4, fill: '#06b6d4' }} activeDot={{ r: 6, strokeWidth: 0 }} />
+                        <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={32} unit=" min" />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
+                          itemStyle={{ color: '#06b6d4' }}
+                          formatter={(value, _name, props) => [
+                            `${value} min`,
+                            (props.payload as { workout?: string } | undefined)?.workout ?? 'Duration',
+                          ]}
+                          labelStyle={{ color: '#94a3b8' }}
+                        />
+                        <Line type="monotone" dataKey="duration" stroke="#06b6d4" strokeWidth={3} dot={{ r: 4, fill: '#06b6d4' }} activeDot={{ r: 6, strokeWidth: 0 }} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
@@ -573,33 +590,14 @@ export default function PlayerDashboard() {
           <div className="space-y-6">
 
             {/* Sub-tab header */}
-            <div className="flex items-center justify-between">
-              <div className="flex gap-1 rounded-lg border border-slate-800 bg-slate-900 p-1">
-                <button
-                  onClick={() => setSorenessSubTab('current')}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    sorenessSubTab === 'current' ? 'bg-cyan-500 text-black' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  Current
-                </button>
-                <button
-                  onClick={() => setSorenessSubTab('history')}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                    sorenessSubTab === 'history' ? 'bg-cyan-500 text-black' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  History
-                </button>
-              </div>
+            <div className="flex items-center justify-end">
               <a href="/check-in" className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black text-sm font-semibold transition-colors">
                 Update Check-In
               </a>
             </div>
 
-            {/* Current sub-tab */}
-            {sorenessSubTab === 'current' && (
-              <div className="space-y-4">
+            {/* Current soreness */}
+            <div className="space-y-4">
                 <p className="text-slate-400 text-sm">
                   From your most recent check-in{latestReport ? ` on ${latestReport.ReportDate}` : ''}
                 </p>
@@ -637,52 +635,9 @@ export default function PlayerDashboard() {
                         );
                       })}
                     </div>
-                  </>
+</>
                 )}
-              </div>
-            )}
-
-            {/* History sub-tab */}
-            {sorenessSubTab === 'history' && (
-              <div className="space-y-4">
-                <p className="text-slate-400 text-sm">Soreness trends across all body regions — last 30 days</p>
-                {sorenessHistory.length === 0 ? (
-                  <div className="rounded-xl border border-slate-800 bg-slate-900 p-10 text-center">
-                    <TrendingUp className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-                    <p className="text-slate-400 font-medium">No history yet</p>
-                    <p className="text-slate-500 text-sm mt-1">Complete multiple check-ins to see trends over time.</p>
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 h-[320px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={sorenessChartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                        <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
-                        <YAxis domain={[0, 10]} stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={24} />
-                        <Tooltip
-                          contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
-                          itemStyle={{ color: '#e2e8f0' }}
-                          labelStyle={{ color: '#94a3b8', marginBottom: 4 }}
-                        />
-                        <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8', paddingTop: 8 }} />
-                        {sorenessRegions.map((region, i) => (
-                          <Line
-                            key={region}
-                            type="monotone"
-                            dataKey={region}
-                            stroke={REGION_COLORS[i % REGION_COLORS.length]}
-                            strokeWidth={2}
-                            dot={{ r: 3 }}
-                            activeDot={{ r: 5, strokeWidth: 0 }}
-                            connectNulls
-                          />
-                        ))}
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </div>
-            )}
+            </div>
           </div>
         )}
 
@@ -895,6 +850,70 @@ export default function PlayerDashboard() {
                   </div>
                 </div>
               )}
+
+              {/* Soreness trend chart */}
+              <section>
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-3">
+                  <TrendingUp size={18} />
+                  Soreness Trends
+                  <span className="text-xs text-slate-500 font-normal ml-1">Last 30 days</span>
+                </h2>
+                {sorenessHistory.length === 0 ? (
+                  <div className="rounded-xl border border-slate-800 bg-slate-900 p-10 text-center">
+                    <TrendingUp className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+                    <p className="text-slate-400 font-medium">No history yet</p>
+                    <p className="text-slate-500 text-sm mt-1">Complete multiple check-ins to see trends over time.</p>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+                    {/* Custom clickable legend */}
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3">
+                      {sorenessRegions.map((region, i) => {
+                        const color = REGION_COLORS[i % REGION_COLORS.length];
+                        const hidden = hiddenLines.has(region);
+                        return (
+                          <button
+                            key={region}
+                            onClick={() => toggleLine(region)}
+                            className="flex items-center gap-1.5 text-xs transition-opacity"
+                            style={{ opacity: hidden ? 0.35 : 1 }}
+                          >
+                            <span className="inline-block w-4 h-0.5 rounded" style={{ backgroundColor: color }} />
+                            <span style={{ color: hidden ? '#64748b' : '#e2e8f0' }}>{region}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="h-[280px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={sorenessChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                        <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} />
+                        <YAxis domain={[0, 10]} stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} width={24} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '8px' }}
+                          itemStyle={{ color: '#e2e8f0' }}
+                          labelStyle={{ color: '#94a3b8', marginBottom: 4 }}
+                        />
+                        {sorenessRegions.map((region, i) => (
+                          <Line
+                            key={region}
+                            type="monotone"
+                            dataKey={region}
+                            stroke={REGION_COLORS[i % REGION_COLORS.length]}
+                            strokeWidth={2}
+                            dot={{ r: 3 }}
+                            activeDot={{ r: 5, strokeWidth: 0 }}
+                            connectNulls
+                            hide={hiddenLines.has(region)}
+                          />
+                        ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+              </section>
             </div>
           );
         })()}

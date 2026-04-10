@@ -91,12 +91,13 @@ export async function GET(
       return NextResponse.json({ error: 'Player not found' }, { status: 404 });
     }
 
-    // Latest soreness report
+    // Latest soreness report that has at least one entry
     const latestReport = db.prepare(`
       SELECT sr.ReportID, sr.ReportDate, sr.ProgressScore, sr.InjuryRiskScore
       FROM SORENESS_REPORT sr
       WHERE sr.AthletePersonID = ?
-      ORDER BY sr.ReportDate DESC
+        AND EXISTS (SELECT 1 FROM SORENESS_ENTRY se WHERE se.ReportID = sr.ReportID)
+      ORDER BY sr.ReportDate DESC, sr.ReportID DESC
       LIMIT 1
     `).get(personId) as {
       ReportID: number;
@@ -152,7 +153,7 @@ export async function GET(
 
     // Recent workout sessions (last 7)
     const sessions = db.prepare(`
-      SELECT ws.SessionDate, w.WorkoutName, ws.Notes
+      SELECT ws.SessionDate, w.WorkoutName, w.Duration, ws.Notes
       FROM WORKOUT_SESSION ws
       JOIN WORKOUT w ON w.WorkoutID = ws.WorkoutID
       WHERE ws.AthletePersonID = ?
@@ -161,6 +162,7 @@ export async function GET(
     `).all(personId) as {
       SessionDate: string;
       WorkoutName: string;
+      Duration: number;
       Notes: string;
     }[];
 
