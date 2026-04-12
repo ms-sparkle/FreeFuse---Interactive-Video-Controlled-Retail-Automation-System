@@ -159,7 +159,7 @@ INSERT INTO "PERSON" ("PersonID","FirstName","LastName","DateOfBirth","AccountID
  (5,'Ethan','Wilson','2006-03-10',5),
  (6,'Fiona','Moore','2005-07-08',6),
  (7,'George','Taylor','2004-09-30',7);
-INSERT INTO "SORENESS_ENTRY" ("EntryID","ReportID","BodyPartID","SorenessLevel","ReportDate") VALUES (1,1,33,4,NULL);
+INSERT INTO "SORENESS_ENTRY" ("EntryID","ReportID","BodyPartID","SorenessLevel","ReportDate") VALUES (1,1,31,4,NULL),(2,1,32,4,NULL);
 INSERT INTO "SORENESS_REPORT" ("ReportID","ReportDate","AthletePersonID","ProgressScore","InjuryRiskScore") VALUES (1,'2026-03-22',3,85,2);
 INSERT INTO "WORKOUT" ("WorkoutID","WorkoutName","BodyPartID","Duration","Reps") VALUES (1,'Leg Extension',39,30,15),
  (2,'Squat',40,45,10),
