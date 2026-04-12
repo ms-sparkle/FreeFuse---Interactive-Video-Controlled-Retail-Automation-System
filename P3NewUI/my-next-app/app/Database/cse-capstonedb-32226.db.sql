@@ -167,6 +167,16 @@ INSERT INTO "WORKOUT" ("WorkoutID","WorkoutName","BodyPartID","Duration","Reps")
  (4,'Dumbbell Curl',10,20,12),
  (5,'Overhead Press',18,25,10),
  (6,'Deadlift',33,50,5);
+CREATE TABLE IF NOT EXISTS "NOTE" (
+    "NoteID"     INTEGER,
+    "PersonID"   INTEGER NOT NULL,
+    "NoteDate"   DATE DEFAULT CURRENT_DATE,
+    "NoteText"   TEXT NOT NULL,
+    PRIMARY KEY("NoteID" AUTOINCREMENT),
+    FOREIGN KEY("PersonID") REFERENCES "PERSON"("PersonID")
+);
+INSERT INTO "NOTE" ("NoteID","PersonID","NoteDate","NoteText") VALUES
+ (1,3,'2026-03-22','Knees feeling better after icing. Will ease into squat volume this week.');
 CREATE TABLE IF NOT EXISTS "WORKOUT_SESSION" (
     "SessionID"       INTEGER,
     "SessionDate"     DATE DEFAULT CURRENT_DATE,
