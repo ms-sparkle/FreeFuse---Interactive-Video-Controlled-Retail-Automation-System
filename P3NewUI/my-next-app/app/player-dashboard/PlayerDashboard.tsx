@@ -85,6 +85,8 @@ type SorenessHistoryRow = {
 
 type SessionHistoryRow = { SessionDate: string; WorkoutName: string; Duration: number; Notes: string };
 
+type JournalEntry = { NoteID: number; NoteDate: string; NoteText: string };
+
 function calcAge(dob: string): number {
   const birth = new Date(dob);
   const today = new Date();
@@ -135,6 +137,13 @@ export default function PlayerDashboard() {
     });
   };
 
+  // Journal (general notes) state
+  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+  const [journalText, setJournalText] = useState('');
+  const [savingJournal, setSavingJournal] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+  const [editingNoteText, setEditingNoteText] = useState('');
+
   // Session history + calendar state
   const [sessionHistory, setSessionHistory] = useState<SessionHistoryRow[]>([]);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
@@ -176,7 +185,66 @@ export default function PlayerDashboard() {
       .then(r => r.json())
       .then(d => setSessionHistory(d.sessions ?? []))
       .catch(console.error);
+
+    fetch('/api/notes')
+      .then(r => r.ok ? r.json() : { notes: [] })
+      .then(d => setJournalEntries(d.notes ?? []))
+      .catch(console.error);
   }, [router]);
+
+  // ================= JOURNAL CRUD =================
+  const addJournalEntry = async () => {
+    if (!journalText.trim()) return;
+    setSavingJournal(true);
+    try {
+      const res = await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: journalText.trim() }),
+      });
+      if (!res.ok) throw new Error();
+      const d = await res.json();
+      setJournalEntries(prev => [d.note, ...prev]);
+      setJournalText('');
+    } catch {
+      alert('Failed to save note.');
+    } finally {
+      setSavingJournal(false);
+    }
+  };
+
+  const saveEditedNote = async (noteId: number) => {
+    if (!editingNoteText.trim()) return;
+    try {
+      const res = await fetch('/api/notes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noteId, text: editingNoteText.trim() }),
+      });
+      if (!res.ok) throw new Error();
+      const d = await res.json();
+      setJournalEntries(prev => prev.map(e => e.NoteID === noteId ? d.note : e));
+      setEditingNoteId(null);
+      setEditingNoteText('');
+    } catch {
+      alert('Failed to save edit.');
+    }
+  };
+
+  const deleteNote = async (noteId: number) => {
+    if (!confirm('Delete this note?')) return;
+    try {
+      const res = await fetch('/api/notes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noteId }),
+      });
+      if (!res.ok) throw new Error();
+      setJournalEntries(prev => prev.filter(e => e.NoteID !== noteId));
+    } catch {
+      alert('Failed to delete note.');
+    }
+  };
 
   // ================= LOG WORKOUT =================
   const logWorkout = async () => {
@@ -563,25 +631,84 @@ export default function PlayerDashboard() {
             </section>
 
             {/* Notes */}
-            {sessions.some(s => s.Notes) && (
-              <section>
-                <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-4">
-                  <CalendarDays size={18} />
-                  Notes
-                </h2>
-                <div className="space-y-2">
-                  {sessions.filter(s => s.Notes).map((s, i) => (
-                    <div key={i} className="rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm">
+            <section>
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-4">
+                <CalendarDays size={18} />
+                Notes
+              </h2>
+              <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 mb-4">
+                <textarea
+                  value={journalText}
+                  onChange={e => setJournalText(e.target.value)}
+                  placeholder="How are you feeling? Recovery notes, goals, observations…"
+                  rows={3}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-cyan-500"
+                />
+                <div className="flex justify-end mt-2">
+                  <button
+                    onClick={addJournalEntry}
+                    disabled={savingJournal || !journalText.trim()}
+                    className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-semibold text-sm transition-colors"
+                  >
+                    {savingJournal ? 'Saving…' : 'Add Note'}
+                  </button>
+                </div>
+              </div>
+              {journalEntries.length === 0 ? (
+                <p className="text-slate-500 text-sm text-center py-4">No notes yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {journalEntries.map(entry => (
+                    <div key={entry.NoteID} className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium">{s.WorkoutName}</span>
-                        <span className="text-slate-400">{s.SessionDate}</span>
+                        <p className="text-xs text-slate-500">{entry.NoteDate}</p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => { setEditingNoteId(entry.NoteID); setEditingNoteText(entry.NoteText); }}
+                            className="text-xs text-slate-400 hover:text-cyan-400 transition-colors"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => deleteNote(entry.NoteID)}
+                            className="text-xs text-slate-400 hover:text-red-400 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
-                      <p className="text-slate-400 text-xs">{s.Notes}</p>
+                      {editingNoteId === entry.NoteID ? (
+                        <div>
+                          <textarea
+                            value={editingNoteText}
+                            onChange={e => setEditingNoteText(e.target.value)}
+                            rows={3}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-cyan-500 mt-1"
+                          />
+                          <div className="flex justify-end gap-2 mt-2">
+                            <button
+                              onClick={() => { setEditingNoteId(null); setEditingNoteText(''); }}
+                              className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg border border-slate-700 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => saveEditedNote(entry.NoteID)}
+                              disabled={!editingNoteText.trim()}
+                              className="text-xs px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-semibold transition-colors"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-200 whitespace-pre-wrap">{entry.NoteText}</p>
+                      )}
                     </div>
                   ))}
                 </div>
-              </section>
-            )}
+              )}
+            </section>
           </div>
         )}
 
@@ -914,6 +1041,7 @@ export default function PlayerDashboard() {
                   </div>
                 )}
               </section>
+
             </div>
           );
         })()}
