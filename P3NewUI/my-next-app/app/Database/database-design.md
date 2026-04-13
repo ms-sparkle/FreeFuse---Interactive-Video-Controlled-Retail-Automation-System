@@ -5,7 +5,8 @@ This document contains the ER diagram for the commercial athlete tracking system
 
 ---
 
-<img width="2385" height="2520" alt="Capstone ER Diagram (1)" src="https://github.com/user-attachments/assets/577e84ba-e78e-49b9-8628-844265a012c5" />
+<img width="2640" height="2520" alt="Capstone ER Diagram (3)" src="https://github.com/user-attachments/assets/8ab0034e-b615-417b-ac52-f02160ec246a" />
+
 
 
 ---
@@ -23,7 +24,8 @@ This document contains the ER diagram for the commercial athlete tracking system
 - TRAINING_PLAN (PlanID [PK], PlanName, CoachPersonID [FK], AthletePersonID [FK], WorkoutID [FK], Notes)
 - WORKOUT_SESSION (SessionID [PK], SessionDate, AthletePersonID [FK], WorkoutID [FK], Notes)
 - COACH_OBSERVATION (ObservationID [PK], ObservationDate, Notes, CoachPersonID [FK], AthletePersonID [FK])
-- ATHLETE_SCORE_HISTORY (ScoreID [PK], AthletePersonID [FK], ScoreDate, InjuryRiskScore, ProgressScore) 
+- ATHLETE_SCORE_HISTORY (ScoreID [PK], AthletePersonID [FK], ScoreDate, InjuryRiskScore, ProgressScore)
+- WORKOUT_BAN (BanID [PK], AthletePersonID, CoachPersonID, MuscleGroup, WorkoutName, CreatedDate, ExpirationDate, BanType)
 
 ## Notes
 
