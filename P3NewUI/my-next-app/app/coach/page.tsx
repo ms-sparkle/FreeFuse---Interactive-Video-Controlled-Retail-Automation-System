@@ -11,6 +11,7 @@ import { User,
   Plus, 
   UserMinus, 
   ChevronLeft } from 'lucide-react';
+import RestrictWorkouts from '../components/RestrictWorkouts';
 
 type Athlete = {
   PersonID: number;
@@ -126,6 +127,7 @@ export default function CoachDashboard() {
   const [roster, setRoster] = useState<Athlete[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [isManagingRoster, setIsManagingRoster] = useState(false);
+  const [coachPersonId, setCoachPersonId] = useState<number | null>(null);
 
   const logout = async () => {
     localStorage.removeItem('session');
@@ -135,6 +137,7 @@ export default function CoachDashboard() {
   const [detail, setDetail] = useState<PlayerDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [coachName, setCoachName] = useState('');
+  
 
   // Load roster on mount using session coachId
   useEffect(() => {
@@ -143,6 +146,7 @@ export default function CoachDashboard() {
       .then(session => {
         if (!session) { router.push('/login'); return; }
         setCoachName(`${session.firstName} ${session.lastName}`);
+        setCoachPersonId(session.personId);
         return fetch(`/api/coach/athletes?coachId=${session.personId}`)
           .then(r => r.json())
           .then(data => setRoster(data.athletes ?? []))
@@ -383,6 +387,14 @@ export default function CoachDashboard() {
                   )}
                 </div>
               </div>
+              {coachPersonId && selectedId && (
+                <div className="mt-10">
+                  <RestrictWorkouts
+                    athleteId={selectedId}
+                    coachId={coachPersonId}
+                  />
+                </div>
+              )}
 
             </div>
 

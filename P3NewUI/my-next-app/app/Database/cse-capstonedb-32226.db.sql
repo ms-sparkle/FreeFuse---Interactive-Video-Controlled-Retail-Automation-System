@@ -80,6 +80,22 @@ CREATE TABLE IF NOT EXISTS "SORENESS_ENTRY" (
     FOREIGN KEY("BodyPartID") REFERENCES "BODYPART"("BodyPartID"),
     FOREIGN KEY("ReportID") REFERENCES "SORENESS_REPORT"("ReportID")
 );
+
+CREATE TABLE IF NOT EXISTS "WORKOUT_BAN" (
+    "BanID"           INTEGER,
+    "AthletePersonID" INTEGER NOT NULL,
+    "CoachPersonID"   INTEGER NOT NULL,
+    "WorkoutID"       INTEGER,          -- NULL when banning by muscle group
+    "MuscleGroup"     TEXT,             -- NULL when banning a specific workout
+    "BanType"         TEXT NOT NULL CHECK("BanType" IN ('workout', 'muscle')),
+    "ExpirationDate"  DATE,             -- NULL = no expiration
+    "CreatedDate"     DATE DEFAULT CURRENT_DATE,
+    PRIMARY KEY("BanID" AUTOINCREMENT),
+    FOREIGN KEY("AthletePersonID") REFERENCES "ATHLETE"("PersonID"),
+    FOREIGN KEY("CoachPersonID")   REFERENCES "COACH"("PersonID"),
+    FOREIGN KEY("WorkoutID")       REFERENCES "WORKOUT"("WorkoutID")
+);
+
 INSERT INTO "ACCOUNT" ("AccountID","Username","PasswordHash") VALUES (1,'c_smith','$2b$10$Go.3..k0/vUZZyhkGde3MeeJwycAsjETJYpmFV2crKzsCtxlQsIFG'),
  (2,'c_jones','$2b$10$4Xs4YDg5fTy20LoFMvyztOJ60dJ6/ymUvCaiqzxerXdlpls1pEE4e'),
  (3,'a_davis','$2b$10$89itnJyAnRFw1QXu21AP5uO.8hdVTxvZRS1RjDyn5z4fAe.Tau4oK'),
