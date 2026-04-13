@@ -85,15 +85,15 @@ CREATE TABLE IF NOT EXISTS "WORKOUT_BAN" (
     "BanID"           INTEGER,
     "AthletePersonID" INTEGER NOT NULL,
     "CoachPersonID"   INTEGER NOT NULL,
-    "WorkoutID"       INTEGER,          -- NULL when banning by muscle group
-    "MuscleGroup"     TEXT,             -- NULL when banning a specific workout
+    "WorkoutID"       INTEGER,
+    "WorkoutName"     TEXT,
+    "MuscleGroup"     TEXT,
     "BanType"         TEXT NOT NULL CHECK("BanType" IN ('workout', 'muscle')),
-    "ExpirationDate"  DATE,             -- NULL = no expiration
+    "ExpirationDate"  DATE,
     "CreatedDate"     DATE DEFAULT CURRENT_DATE,
     PRIMARY KEY("BanID" AUTOINCREMENT),
     FOREIGN KEY("AthletePersonID") REFERENCES "ATHLETE"("PersonID"),
-    FOREIGN KEY("CoachPersonID")   REFERENCES "COACH"("PersonID"),
-    FOREIGN KEY("WorkoutID")       REFERENCES "WORKOUT"("WorkoutID")
+    FOREIGN KEY("CoachPersonID")   REFERENCES "COACH"("PersonID")
 );
 
 INSERT INTO "ACCOUNT" ("AccountID","Username","PasswordHash") VALUES (1,'c_smith','$2b$10$Go.3..k0/vUZZyhkGde3MeeJwycAsjETJYpmFV2crKzsCtxlQsIFG'),

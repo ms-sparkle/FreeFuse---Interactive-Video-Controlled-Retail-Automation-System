@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     expirationDate?: string | null;
   };
 
-  const { athleteId, coachId, banType, workoutId, muscleGroup, expirationDate } = body;
+  const { athleteId, coachId, banType, workoutId, workoutName, muscleGroup, expirationDate } = body;
 
   if (!athleteId || !coachId || !banType) {
     return NextResponse.json({ error: 'athleteId, coachId, and banType are required' }, { status: 400 });
@@ -106,17 +106,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'An active ban already exists for this workout/muscle group' }, { status: 409 });
   }
 
-  const result = db.prepare(`
-    INSERT INTO WORKOUT_BAN (AthletePersonID, CoachPersonID, WorkoutID, MuscleGroup, BanType, ExpirationDate)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(
-    athleteId,
-    coachId,
-    workoutId ?? null,
-    muscleGroup ?? null,
-    banType,
+  db.prepare(`
+    INSERT INTO WORKOUT_BAN (
+    AthletePersonID, 
+    CoachPersonID, 
+    WorkoutID, 
+    WorkoutName, 
+    MuscleGroup, 
+    BanType, 
+    ExpirationDate)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+`).run(
+    athleteId, 
+    coachId, 
+    workoutId ?? null, 
+    workoutName ?? null, 
+    muscleGroup ?? null, 
+    banType, 
     expirationDate ?? null
-  );
+);
+
 
   const ban = db.prepare(`
     SELECT

@@ -214,6 +214,7 @@ function AddBanModal({
   onSave: (payload: {
     banType: "workout" | "muscle";
     workoutId: number | null;
+    workoutName: string | null;   // ← add this line
     muscleGroup: string | null;
     expirationDate: string | null;
   }) => Promise<void>;
@@ -239,10 +240,13 @@ function AddBanModal({
     try {
       await onSave({
         banType,
-        workoutId: banType === "workout" ? workoutId : null,
+        workoutId,
+        workoutName: banType === "workout"
+            ? dbWorkouts.find(w => w.WorkoutID === workoutId)?.WorkoutName ?? null
+            : null,
         muscleGroup: banType === "muscle" ? muscleGroup : null,
         expirationDate: noExpiry ? null : expirationDate,
-      });
+        });
       onClose();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to save ban.");
@@ -415,18 +419,12 @@ export default function RestrictWorkouts({
     setLoading(true);
     Promise.all([
       fetch(`/api/coach/workout-bans?athleteId=${athleteId}`).then(r => r.json()),
-      fetch("/api/exercises").then(r => r.ok ? r.json() : { exercises: [] }),
+      fetch("/api/workouts-json").then(r => r.ok ? r.json() : { exercises: [] }),
     ])
       .then(([bansData, exData]) => {
         setBans(bansData.bans ?? []);
-        // Map exercises endpoint shape → DbWorkout shape
-        const mapped: DbWorkout[] = (exData.exercises ?? []).map((e: { ExerciseID: number; Name: string; TargetMuscle: string }) => ({
-          WorkoutID: e.ExerciseID,
-          WorkoutName: e.Name,
-          BodyPartName: e.TargetMuscle,
-        }));
-        setDbWorkouts(mapped);
-      })
+        setDbWorkouts(exData.exercises ?? []);  // ← no remapping needed now
+    })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [athleteId]);
@@ -434,18 +432,15 @@ export default function RestrictWorkouts({
   async function handleAddBan(payload: {
     banType: "workout" | "muscle";
     workoutId: number | null;
+    workoutName: string | null;   // ← add this
     muscleGroup: string | null;
     expirationDate: string | null;
   }) {
-    const res = await fetch("/api/coach/workout-bans", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        athleteId,
-        coachId,
-        ...payload,
-      }),
-    });
+  const res = await fetch("/api/coach/workout-bans", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ athleteId, coachId, ...payload }),
+  });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "Failed to add ban");
     setBans((prev) => [data.ban, ...prev]);
@@ -465,7 +460,7 @@ export default function RestrictWorkouts({
   function banLabel(ban: WorkoutBan): string {
     if (ban.BanType === "workout") return ban.WorkoutName ?? `Workout #${ban.WorkoutID}`;
     return `${ban.MuscleGroup} (muscle group)`;
-  }
+}
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
