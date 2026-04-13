@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
     coachId?: number;
     banType?: 'workout' | 'muscle';
     workoutId?: number | null;
+    workoutName?: string | null;
     muscleGroup?: string | null;
     expirationDate?: string | null;
   };
@@ -127,17 +128,34 @@ export async function POST(req: NextRequest) {
 );
 
 
-  const ban = db.prepare(`
-    SELECT
-      wb.BanID, wb.BanType, wb.WorkoutID, wb.MuscleGroup,
-      wb.ExpirationDate, wb.CreatedDate,
-      w.WorkoutName,
-      p.FirstName || ' ' || p.LastName AS CoachName
+  const result = db.prepare(`
+    INSERT INTO WORKOUT_BAN 
+        (AthletePersonID, 
+        CoachPersonID, 
+        WorkoutID, 
+        WorkoutName, 
+        MuscleGroup, 
+        BanType, 
+        ExpirationDate)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+        athleteId, 
+        coachId, 
+        workoutId ?? null, 
+        workoutName ?? null, 
+        muscleGroup ?? null, 
+        banType, 
+        expirationDate ?? null
+    );
+
+const ban = db.prepare(`SELECT
+    wb.BanID, wb.BanType, wb.WorkoutID, wb.WorkoutName, wb.MuscleGroup,
+    wb.ExpirationDate, wb.CreatedDate,
+    p.FirstName || ' ' || p.LastName AS CoachName
     FROM WORKOUT_BAN wb
-    LEFT JOIN WORKOUT w ON w.WorkoutID = wb.WorkoutID
     JOIN PERSON p ON p.PersonID = wb.CoachPersonID
-    WHERE wb.BanID = ?
-  `).get(result.lastInsertRowid);
+    WHERE wb.BanID = ?`)
+  .get(result.lastInsertRowid);
 
   return NextResponse.json({ ban });
 }
