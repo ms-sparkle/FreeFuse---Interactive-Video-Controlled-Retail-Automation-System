@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
+import { generateRecommendations } from '@/lib/recommendationEngine';
 
 export async function PUT(
   req: NextRequest,
@@ -121,35 +122,23 @@ export async function GET(
         }[])
       : [];
 
-    // Workout suggestions based on sore body parts
-    const workoutSuggestions = sorenessEntries.length > 0
-      ? (db.prepare(`
-          SELECT DISTINCT w.WorkoutName, w.Duration, w.Reps, bp.BodyPartName
-          FROM WORKOUT w
-          JOIN BODYPART bp ON bp.BodyPartID = w.BodyPartID
-          WHERE w.BodyPartID NOT IN (
-            SELECT se.BodyPartID FROM SORENESS_ENTRY se
-            JOIN SORENESS_REPORT sr ON sr.ReportID = se.ReportID
-            WHERE sr.AthletePersonID = ? AND se.SorenessLevel >= 5
-          )
-          LIMIT 3
-        `).all(personId) as {
-          WorkoutName: string;
-          Duration: number;
-          Reps: number;
-          BodyPartName: string;
-        }[])
-      : (db.prepare(`
-          SELECT w.WorkoutName, w.Duration, w.Reps, bp.BodyPartName
-          FROM WORKOUT w
-          JOIN BODYPART bp ON bp.BodyPartID = w.BodyPartID
-          LIMIT 3
-        `).all() as {
-          WorkoutName: string;
-          Duration: number;
-          Reps: number;
-          BodyPartName: string;
-        }[]);
+
+    // Get ALL workouts first
+    const allWorkouts = db.prepare(`
+      SELECT WorkoutName, Duration, Reps, bp.BodyPartName
+      FROM WORKOUT w
+      JOIN BODYPART bp ON bp.BodyPartID = w.BodyPartID
+    `).all();
+
+
+    // Generate recommendations
+    const workoutSuggestions =
+      sorenessEntries.length > 0
+        ? generateRecommendations(sorenessEntries, allWorkouts)
+        : allWorkouts.slice(0, 3);
+
+    //debug    
+    console.log("DEBUG workoutSuggestions:", workoutSuggestions);    
 
     // Recent workout sessions (last 7)
     const sessions = db.prepare(`
