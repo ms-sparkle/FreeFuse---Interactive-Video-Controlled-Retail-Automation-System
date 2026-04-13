@@ -61,6 +61,16 @@ export default function BodyMap() {
           setBodyVariant(session.sex.toLowerCase() === 'male' ? 'male' : 'female');
         }
       });
+
+    // Pre-populate with any soreness already logged today
+    fetch('/api/check-in')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.sorenessData && Object.keys(d.sorenessData).length > 0) {
+          setSorenessData(d.sorenessData);
+        }
+      })
+      .catch(() => {/* silently ignore */});
   }, []);
 
   const [bodySide, setBodySide] = useState<'front' | 'back'>('front');

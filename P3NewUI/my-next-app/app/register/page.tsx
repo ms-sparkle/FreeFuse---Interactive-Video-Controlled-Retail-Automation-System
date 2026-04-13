@@ -3,7 +3,7 @@
 import React, { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Lock, User, ArrowLeft, Shield } from 'lucide-react';
+import { UserPlus, Lock, User, ArrowLeft, Shield, Eye, EyeOff } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 
 function RegisterContent() {
@@ -16,6 +16,7 @@ function RegisterContent() {
     const [lastName, setLastName] = useState('');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
@@ -128,13 +129,21 @@ function RegisterContent() {
                     <label className="block text-sm font-medium text-slate-400 mb-1">Password</label>
                     <div className="relative">
                         <input
-                            type="password"
+                            type={showPassword ? 'text' : 'password'}
                             value={password}
                             onChange={e => setPassword(e.target.value)}
-                            className={`w-full bg-slate-950 border border-slate-700 rounded-lg pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-1 transition-all ${inputFocus}`}
+                            className={`w-full bg-slate-950 border border-slate-700 rounded-lg pl-11 pr-11 py-3 text-white focus:outline-none focus:ring-1 transition-all ${inputFocus}`}
                             placeholder="Min. 6 characters"
                         />
                         <Lock className="absolute left-4 top-3.5 text-slate-500 w-5 h-5" />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword(prev => !prev)}
+                            className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300 focus:outline-none"
+                            tabIndex={-1}
+                        >
+                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
                     </div>
                 </div>
 

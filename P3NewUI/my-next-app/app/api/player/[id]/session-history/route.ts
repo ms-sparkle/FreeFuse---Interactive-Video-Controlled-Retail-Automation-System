@@ -16,7 +16,7 @@ export async function GET(
     const db = getDb();
 
     const sessions = db.prepare(`
-      SELECT ws.SessionDate, w.WorkoutName, ws.Notes
+      SELECT ws.SessionDate, w.WorkoutName, w.Duration, ws.Notes
       FROM WORKOUT_SESSION ws
       JOIN WORKOUT w ON w.WorkoutID = ws.WorkoutID
       WHERE ws.AthletePersonID = ?
@@ -24,6 +24,7 @@ export async function GET(
     `).all(personId) as {
       SessionDate: string;
       WorkoutName: string;
+      Duration: number;
       Notes: string;
     }[];
 

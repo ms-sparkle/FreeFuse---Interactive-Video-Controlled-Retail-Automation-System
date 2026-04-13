@@ -1,0 +1,88 @@
+{
+  "exercises": [
+    {
+      "name": "Push-ups",
+      "type": "Strength",
+      "primary_nodes": ["Pectorals / Shoulders"],
+      "secondary_nodes": ["Abs / Obliques", "Neck / Traps"]
+    },
+    {
+      "name": "Barbell Bench Press",
+      "type": "Strength",
+      "primary_nodes": ["Pectorals / Shoulders"],
+      "secondary_nodes": []
+    },
+    {
+      "name": "Overhead Shoulder Press",
+      "type": "Strength",
+      "primary_nodes": ["Pectorals / Shoulders", "Neck / Traps"],
+      "secondary_nodes": ["Abs / Obliques"]
+    },
+    {
+      "name": "Pull-ups",
+      "type": "Strength",
+      "primary_nodes": ["Mid-Back / Lats"],
+      "secondary_nodes": ["Pectorals / Shoulders"]
+    },
+    {
+      "name": "Bent-Over Barbell Rows",
+      "type": "Strength",
+      "primary_nodes": ["Mid-Back / Lats"],
+      "secondary_nodes": ["Quadriceps / Hamstrings", "Neck / Traps"]
+    },
+    {
+      "name": "Barbell Squats",
+      "type": "Strength",
+      "primary_nodes": ["Quadriceps / Hamstrings"],
+      "secondary_nodes": ["Abs / Obliques", "Calves / Ankles"]
+    },
+    {
+      "name": "Romanian Deadlifts (RDLs)",
+      "type": "Strength",
+      "primary_nodes": ["Quadriceps / Hamstrings", "Mid-Back / Lats"],
+      "secondary_nodes": ["Abs / Obliques"]
+    },
+    {
+      "name": "Walking Lunges",
+      "type": "Strength",
+      "primary_nodes": ["Quadriceps / Hamstrings"],
+      "secondary_nodes": ["Calves / Ankles"]
+    },
+    {
+      "name": "Plank",
+      "type": "Core",
+      "primary_nodes": ["Abs / Obliques"],
+      "secondary_nodes": ["Pectorals / Shoulders"]
+    },
+    {
+      "name": "Russian Twists",
+      "type": "Core",
+      "primary_nodes": ["Abs / Obliques"],
+      "secondary_nodes": []
+    },
+    {
+      "name": "Standing Calf Raises",
+      "type": "Strength",
+      "primary_nodes": ["Calves / Ankles"],
+      "secondary_nodes": []
+    },
+    {
+      "name": "Dumbbell Shrugs",
+      "type": "Strength",
+      "primary_nodes": ["Neck / Traps"],
+      "secondary_nodes": ["Pectorals / Shoulders"]
+    },
+    {
+      "name": "Box Jumps",
+      "type": "Plyometric",
+      "primary_nodes": ["Quadriceps / Hamstrings", "Calves / Ankles"],
+      "secondary_nodes": ["Abs / Obliques"]
+    },
+    {
+      "name": "Jump Rope",
+      "type": "Cardio",
+      "primary_nodes": ["Calves / Ankles"],
+      "secondary_nodes": ["Pectorals / Shoulders"]
+    }
+  ]
+}

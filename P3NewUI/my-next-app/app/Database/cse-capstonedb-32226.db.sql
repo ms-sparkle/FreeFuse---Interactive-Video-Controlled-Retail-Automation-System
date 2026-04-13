@@ -80,6 +80,22 @@ CREATE TABLE IF NOT EXISTS "SORENESS_ENTRY" (
     FOREIGN KEY("BodyPartID") REFERENCES "BODYPART"("BodyPartID"),
     FOREIGN KEY("ReportID") REFERENCES "SORENESS_REPORT"("ReportID")
 );
+
+CREATE TABLE IF NOT EXISTS "WORKOUT_BAN" (
+    "BanID"           INTEGER,
+    "AthletePersonID" INTEGER NOT NULL,
+    "CoachPersonID"   INTEGER NOT NULL,
+    "WorkoutID"       INTEGER,
+    "WorkoutName"     TEXT,
+    "MuscleGroup"     TEXT,
+    "BanType"         TEXT NOT NULL CHECK("BanType" IN ('workout', 'muscle')),
+    "ExpirationDate"  DATE,
+    "CreatedDate"     DATE DEFAULT CURRENT_DATE,
+    PRIMARY KEY("BanID" AUTOINCREMENT),
+    FOREIGN KEY("AthletePersonID") REFERENCES "ATHLETE"("PersonID"),
+    FOREIGN KEY("CoachPersonID")   REFERENCES "COACH"("PersonID")
+);
+
 INSERT INTO "ACCOUNT" ("AccountID","Username","PasswordHash") VALUES (1,'c_smith','$2b$10$Go.3..k0/vUZZyhkGde3MeeJwycAsjETJYpmFV2crKzsCtxlQsIFG'),
  (2,'c_jones','$2b$10$4Xs4YDg5fTy20LoFMvyztOJ60dJ6/ymUvCaiqzxerXdlpls1pEE4e'),
  (3,'a_davis','$2b$10$89itnJyAnRFw1QXu21AP5uO.8hdVTxvZRS1RjDyn5z4fAe.Tau4oK'),
@@ -159,7 +175,7 @@ INSERT INTO "PERSON" ("PersonID","FirstName","LastName","DateOfBirth","AccountID
  (5,'Ethan','Wilson','2006-03-10',5),
  (6,'Fiona','Moore','2005-07-08',6),
  (7,'George','Taylor','2004-09-30',7);
-INSERT INTO "SORENESS_ENTRY" ("EntryID","ReportID","BodyPartID","SorenessLevel","ReportDate") VALUES (1,1,33,4,NULL);
+INSERT INTO "SORENESS_ENTRY" ("EntryID","ReportID","BodyPartID","SorenessLevel","ReportDate") VALUES (1,1,31,4,NULL),(2,1,32,4,NULL);
 INSERT INTO "SORENESS_REPORT" ("ReportID","ReportDate","AthletePersonID","ProgressScore","InjuryRiskScore") VALUES (1,'2026-03-22',3,85,2);
 INSERT INTO "WORKOUT" ("WorkoutID","WorkoutName","BodyPartID","Duration","Reps") VALUES (1,'Leg Extension',39,30,15),
  (2,'Squat',40,45,10),
@@ -167,6 +183,28 @@ INSERT INTO "WORKOUT" ("WorkoutID","WorkoutName","BodyPartID","Duration","Reps")
  (4,'Dumbbell Curl',10,20,12),
  (5,'Overhead Press',18,25,10),
  (6,'Deadlift',33,50,5);
+CREATE TABLE IF NOT EXISTS "COACH_NOTE" (
+    "NoteID"           INTEGER,
+    "CoachPersonID"    INTEGER NOT NULL,
+    "AthletePersonID"  INTEGER NOT NULL,
+    "NoteDate"         DATE DEFAULT CURRENT_DATE,
+    "NoteText"         TEXT NOT NULL,
+    PRIMARY KEY("NoteID" AUTOINCREMENT),
+    FOREIGN KEY("CoachPersonID")   REFERENCES "COACH"("PersonID"),
+    FOREIGN KEY("AthletePersonID") REFERENCES "ATHLETE"("PersonID")
+);
+INSERT INTO "COACH_NOTE" ("NoteID","CoachPersonID","AthletePersonID","NoteDate","NoteText") VALUES
+ (1,1,3,'2026-03-22','Great effort this week Charlie. Focus on controlled descent in squats to protect those knees.');
+CREATE TABLE IF NOT EXISTS "NOTE" (
+    "NoteID"     INTEGER,
+    "PersonID"   INTEGER NOT NULL,
+    "NoteDate"   DATE DEFAULT CURRENT_DATE,
+    "NoteText"   TEXT NOT NULL,
+    PRIMARY KEY("NoteID" AUTOINCREMENT),
+    FOREIGN KEY("PersonID") REFERENCES "PERSON"("PersonID")
+);
+INSERT INTO "NOTE" ("NoteID","PersonID","NoteDate","NoteText") VALUES
+ (1,3,'2026-03-22','Knees feeling better after icing. Will ease into squat volume this week.');
 CREATE TABLE IF NOT EXISTS "WORKOUT_SESSION" (
     "SessionID"       INTEGER,
     "SessionDate"     DATE DEFAULT CURRENT_DATE,

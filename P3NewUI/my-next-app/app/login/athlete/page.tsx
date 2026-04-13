@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, Suspense } from 'react';
-import { User, Lock, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { User, Lock, ArrowLeft, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 
 function AthleteLoginForm() {
     const router = useRouter();
@@ -11,6 +11,7 @@ function AthleteLoginForm() {
 
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -88,14 +89,21 @@ function AthleteLoginForm() {
                     <label className="block text-sm font-medium text-slate-400 mb-1">Password</label>
                     <div className="relative">
                         <input
-                            type="password"
+                            type={showPassword ? 'text' : 'password'}
                             value={password}
                             onChange={e => setPassword(e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
+                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 pr-11 py-3 text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
                             placeholder="********"
                             required
                         />
-                        <Lock className="absolute right-4 top-3.5 text-slate-500 w-5 h-5" />
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword(prev => !prev)}
+                            className="absolute right-4 top-3.5 text-slate-500 hover:text-slate-300 focus:outline-none"
+                            tabIndex={-1}
+                        >
+                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
                     </div>
                 </div>
 

@@ -1,5 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { jwtVerify } from 'jose';
 import getDb from '@/lib/db';
+
+// GET /api/check-in — returns today's soreness for the authenticated athlete as slug-keyed record
+export async function GET(req: NextRequest) {
+  const token = req.cookies.get('session')?.value;
+  if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+
+  let personId: number;
+  try {
+    const secret = new TextEncoder().encode(process.env.SESSION_SECRET);
+    const { payload } = await jwtVerify(token, secret);
+    personId = payload.personId as number;
+  } catch {
+    return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+  }
+
+  const db = getDb();
+  const rows = db.prepare(`
+    SELECT bp.BodyPartName, bp.Side, se.SorenessLevel
+    FROM SORENESS_ENTRY se
+    JOIN SORENESS_REPORT sr ON sr.ReportID = se.ReportID
+    JOIN BODYPART bp ON bp.BodyPartID = se.BodyPartID
+    WHERE sr.AthletePersonID = ? AND sr.ReportDate = date('now')
+  `).all(personId) as { BodyPartName: string; Side: string; SorenessLevel: number }[];
+
+  // Convert DB rows to the slug-keyed format used by BodyMap
+  const sorenessData: Record<string, number> = {};
+  for (const row of rows) {
+    const base = row.BodyPartName.toLowerCase().replace(/ /g, '-');
+    const key = row.Side === 'Left' ? `${base}_left`
+               : row.Side === 'Right' ? `${base}_right`
+               : base;
+    sorenessData[key] = row.SorenessLevel;
+  }
+
+  return NextResponse.json({ sorenessData });
+}
 
 // POST /api/check-in
 // Body: { athletePersonId: number, sorenessData: { [muscleSlug: string]: number } }
@@ -26,6 +63,19 @@ export async function POST(req: NextRequest) {
     const levels = Object.values(sorenessData);
     const injuryRiskScore = levels.filter(l => l >= 7).length;
     const progressScore = Math.max(0, 100 - levels.reduce((a, b) => a + b, 0));
+
+    // Delete any existing report for today so check-in replaces rather than duplicates
+    const todayReports = db.prepare(`
+      SELECT ReportID FROM SORENESS_REPORT
+      WHERE AthletePersonID = ? AND ReportDate = date('now')
+    `).all(athletePersonId) as { ReportID: number }[];
+
+    if (todayReports.length > 0) {
+      const ids = todayReports.map(r => r.ReportID);
+      const placeholders = ids.map(() => '?').join(', ');
+      db.prepare(`DELETE FROM SORENESS_ENTRY WHERE ReportID IN (${placeholders})`).run(...ids);
+      db.prepare(`DELETE FROM SORENESS_REPORT WHERE ReportID IN (${placeholders})`).run(...ids);
+    }
 
     // Create the soreness report
     const reportResult = db.prepare(`
