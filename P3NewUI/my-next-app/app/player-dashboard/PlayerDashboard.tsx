@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Activity, AlertTriangle, CalendarDays, Dumbbell, LogOut,
+  Activity, AlertTriangle, CalendarDays, ChevronDown, Dumbbell, LogOut,
   Settings, ShieldCheck, Target, TrendingUp, User, CheckCircle2,
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -86,6 +86,7 @@ type SorenessHistoryRow = {
 type SessionHistoryRow = { SessionDate: string; WorkoutName: string; Duration: number; Notes: string };
 
 type JournalEntry = { NoteID: number; NoteDate: string; NoteText: string };
+type CoachNote = { NoteID: number; NoteDate: string; NoteText: string; CoachFirstName: string; CoachLastName: string };
 
 function calcAge(dob: string): number {
   const birth = new Date(dob);
@@ -136,6 +137,11 @@ export default function PlayerDashboard() {
       return next;
     });
   };
+
+  // Coach notes (read-only)
+  const [coachNotes, setCoachNotes] = useState<CoachNote[]>([]);
+  const [coachNotesOpen, setCoachNotesOpen] = useState(true);
+  const [noteModalOpen, setNoteModalOpen] = useState(false);
 
   // Journal (general notes) state
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
@@ -189,6 +195,11 @@ export default function PlayerDashboard() {
     fetch('/api/notes')
       .then(r => r.ok ? r.json() : { notes: [] })
       .then(d => setJournalEntries(d.notes ?? []))
+      .catch(console.error);
+
+    fetch('/api/coach-notes')
+      .then(r => r.ok ? r.json() : { notes: [] })
+      .then(d => setCoachNotes(d.notes ?? []))
       .catch(console.error);
   }, [router]);
 
@@ -615,45 +626,97 @@ export default function PlayerDashboard() {
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="mt-3 space-y-2">
-                    {sessions.map((s, i) => (
-                      <div key={i} className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm">
-                        <span className="font-medium">{s.WorkoutName}</span>
-                        <div className="flex items-center gap-4">
-                          {s.Notes && <span className="text-slate-500 hidden md:block">{s.Notes}</span>}
+                  <div className="mt-3 rounded-xl border border-slate-700 bg-slate-900/60 p-3">
+                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                      {sessions.map((s, i) => (
+                        <div key={i} className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm">
+                          <span className="font-medium">{s.WorkoutName}</span>
                           <span className="text-slate-400">{s.SessionDate}</span>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </>
               )}
             </section>
 
+            {/* Coach Notes (read-only, collapsible) */}
+            {coachNotes.length > 0 && (
+              <section>
+                <button
+                  onClick={() => setCoachNotesOpen(o => !o)}
+                  className="flex items-center justify-between w-full text-left mb-4"
+                >
+                  <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300">
+                    Coach Notes
+                    <span className="text-xs font-normal text-slate-500 ml-1">({coachNotes.length})</span>
+                  </h2>
+                  <ChevronDown
+                    size={18}
+                    className={`text-slate-400 transition-transform duration-200 ${coachNotesOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {coachNotesOpen && (
+                  <div className="space-y-3">
+                    {coachNotes.map(note => (
+                      <div key={note.NoteID} className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3">
+                        <p className="text-xs text-slate-500 mb-1">
+                          {note.CoachFirstName} {note.CoachLastName} &middot; {note.NoteDate}
+                        </p>
+                        <p className="text-sm text-slate-200 whitespace-pre-wrap">{note.NoteText}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
             {/* Notes */}
             <section>
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-4">
-                <CalendarDays size={18} />
-                Notes
-              </h2>
-              <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 mb-4">
-                <textarea
-                  value={journalText}
-                  onChange={e => setJournalText(e.target.value)}
-                  placeholder="How are you feeling? Recovery notes, goals, observations…"
-                  rows={3}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-cyan-500"
-                />
-                <div className="flex justify-end mt-2">
-                  <button
-                    onClick={addJournalEntry}
-                    disabled={savingJournal || !journalText.trim()}
-                    className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-semibold text-sm transition-colors"
-                  >
-                    {savingJournal ? 'Saving…' : 'Add Note'}
-                  </button>
-                </div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300">
+                  <CalendarDays size={18} />
+                  Notes
+                </h2>
+                <button
+                  onClick={() => setNoteModalOpen(true)}
+                  className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black text-sm font-semibold transition-colors"
+                >
+                  + Add Note
+                </button>
               </div>
+
+              {/* Add Note Modal */}
+              {noteModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                  <div className="w-full max-w-md mx-4 rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+                    <h3 className="text-base font-semibold text-cyan-300 mb-4">New Note</h3>
+                    <textarea
+                      value={journalText}
+                      onChange={e => setJournalText(e.target.value)}
+                      placeholder="How are you feeling? Recovery notes, goals, observations…"
+                      rows={5}
+                      autoFocus
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-cyan-500"
+                    />
+                    <div className="flex justify-end gap-2 mt-4">
+                      <button
+                        onClick={() => { setNoteModalOpen(false); setJournalText(''); }}
+                        className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:text-white text-sm transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={async () => { await addJournalEntry(); setNoteModalOpen(false); }}
+                        disabled={savingJournal || !journalText.trim()}
+                        className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-semibold text-sm transition-colors"
+                      >
+                        {savingJournal ? 'Saving…' : 'Save Note'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
               {journalEntries.length === 0 ? (
                 <p className="text-slate-500 text-sm text-center py-4">No notes yet.</p>
               ) : (

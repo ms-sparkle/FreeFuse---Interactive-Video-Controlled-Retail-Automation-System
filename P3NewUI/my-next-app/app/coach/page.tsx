@@ -43,6 +43,8 @@ type PlayerDetail = {
   workoutSuggestions: { WorkoutName: string; Duration: number; Reps: number; BodyPartName: string }[];
 };
 
+type CoachNote = { NoteID: number; NoteDate: string; NoteText: string };
+
 /* --- MODAL COMPONENT --- */
 const ManageRosterModal = ({ 
   isOpen, 
@@ -136,6 +138,13 @@ export default function CoachDashboard() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [coachName, setCoachName] = useState('');
 
+  // Coach notes state
+  const [coachNotes, setCoachNotes] = useState<CoachNote[]>([]);
+  const [coachNoteText, setCoachNoteText] = useState('');
+  const [savingCoachNote, setSavingCoachNote] = useState(false);
+  const [editingCoachNoteId, setEditingCoachNoteId] = useState<number | null>(null);
+  const [editingCoachNoteText, setEditingCoachNoteText] = useState('');
+
   // Load roster on mount using session coachId
   useEffect(() => {
     fetch('/api/auth/session')
@@ -152,11 +161,19 @@ export default function CoachDashboard() {
 
   // Load individual athlete detail when selected
   useEffect(() => {
-    if (!selectedId) { setDetail(null); return; }
+    if (!selectedId) { setDetail(null); setCoachNotes([]); return; }
     setLoadingDetail(true);
-    fetch(`/api/player/${selectedId}`)
-      .then(r => r.json())
-      .then(data => setDetail(data))
+    setCoachNotes([]);
+    setCoachNoteText('');
+    setEditingCoachNoteId(null);
+    Promise.all([
+      fetch(`/api/player/${selectedId}`).then(r => r.json()),
+      fetch(`/api/coach-notes?athleteId=${selectedId}`).then(r => r.ok ? r.json() : { notes: [] }),
+    ])
+      .then(([playerData, notesData]) => {
+        setDetail(playerData);
+        setCoachNotes(notesData.notes ?? []);
+      })
       .catch(console.error)
       .finally(() => setLoadingDetail(false));
   }, [selectedId]);
@@ -209,6 +226,59 @@ export default function CoachDashboard() {
       }
     } catch (err) {
       console.error("Failed to invite athlete", err);
+    }
+  };
+
+  const addCoachNote = async () => {
+    if (!coachNoteText.trim() || !selectedId) return;
+    setSavingCoachNote(true);
+    try {
+      const res = await fetch('/api/coach-notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ athleteId: selectedId, text: coachNoteText.trim() }),
+      });
+      if (!res.ok) throw new Error();
+      const d = await res.json();
+      setCoachNotes(prev => [d.note, ...prev]);
+      setCoachNoteText('');
+    } catch {
+      alert('Failed to save note.');
+    } finally {
+      setSavingCoachNote(false);
+    }
+  };
+
+  const saveEditedCoachNote = async (noteId: number) => {
+    if (!editingCoachNoteText.trim()) return;
+    try {
+      const res = await fetch('/api/coach-notes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noteId, text: editingCoachNoteText.trim() }),
+      });
+      if (!res.ok) throw new Error();
+      const d = await res.json();
+      setCoachNotes(prev => prev.map(n => n.NoteID === noteId ? d.note : n));
+      setEditingCoachNoteId(null);
+      setEditingCoachNoteText('');
+    } catch {
+      alert('Failed to save edit.');
+    }
+  };
+
+  const deleteCoachNote = async (noteId: number) => {
+    if (!confirm('Delete this note?')) return;
+    try {
+      const res = await fetch('/api/coach-notes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noteId }),
+      });
+      if (!res.ok) throw new Error();
+      setCoachNotes(prev => prev.filter(n => n.NoteID !== noteId));
+    } catch {
+      alert('Failed to delete note.');
     }
   };
 
@@ -384,6 +454,83 @@ export default function CoachDashboard() {
                 </div>
               </div>
 
+            </div>
+
+            {/* Coach Notes */}
+            <div className="mt-10 bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <h3 className="text-slate-400 text-sm uppercase font-bold mb-4">Notes for {detail.player.FirstName}</h3>
+              <div className="mb-4">
+                <textarea
+                  value={coachNoteText}
+                  onChange={e => setCoachNoteText(e.target.value)}
+                  placeholder={`Write a note for ${detail.player.FirstName}…`}
+                  rows={3}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-cyan-500"
+                />
+                <div className="flex justify-end mt-2">
+                  <button
+                    onClick={addCoachNote}
+                    disabled={savingCoachNote || !coachNoteText.trim()}
+                    className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-semibold text-sm transition-colors"
+                  >
+                    {savingCoachNote ? 'Saving…' : 'Add Note'}
+                  </button>
+                </div>
+              </div>
+              {coachNotes.length === 0 ? (
+                <p className="text-slate-600 text-sm">No notes yet for this athlete.</p>
+              ) : (
+                <div className="space-y-3">
+                  {coachNotes.map(note => (
+                    <div key={note.NoteID} className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs text-slate-500">{note.NoteDate}</p>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => { setEditingCoachNoteId(note.NoteID); setEditingCoachNoteText(note.NoteText); }}
+                            className="text-xs text-slate-400 hover:text-cyan-400 transition-colors"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => deleteCoachNote(note.NoteID)}
+                            className="text-xs text-slate-400 hover:text-red-400 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                      {editingCoachNoteId === note.NoteID ? (
+                        <div>
+                          <textarea
+                            value={editingCoachNoteText}
+                            onChange={e => setEditingCoachNoteText(e.target.value)}
+                            rows={3}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-cyan-500 mt-1"
+                          />
+                          <div className="flex justify-end gap-2 mt-2">
+                            <button
+                              onClick={() => { setEditingCoachNoteId(null); setEditingCoachNoteText(''); }}
+                              className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg border border-slate-700 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => saveEditedCoachNote(note.NoteID)}
+                              disabled={!editingCoachNoteText.trim()}
+                              className="text-xs px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-semibold transition-colors"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-200 whitespace-pre-wrap">{note.NoteText}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
           </div>

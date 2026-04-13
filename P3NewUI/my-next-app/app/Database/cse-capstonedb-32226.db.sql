@@ -167,6 +167,18 @@ INSERT INTO "WORKOUT" ("WorkoutID","WorkoutName","BodyPartID","Duration","Reps")
  (4,'Dumbbell Curl',10,20,12),
  (5,'Overhead Press',18,25,10),
  (6,'Deadlift',33,50,5);
+CREATE TABLE IF NOT EXISTS "COACH_NOTE" (
+    "NoteID"           INTEGER,
+    "CoachPersonID"    INTEGER NOT NULL,
+    "AthletePersonID"  INTEGER NOT NULL,
+    "NoteDate"         DATE DEFAULT CURRENT_DATE,
+    "NoteText"         TEXT NOT NULL,
+    PRIMARY KEY("NoteID" AUTOINCREMENT),
+    FOREIGN KEY("CoachPersonID")   REFERENCES "COACH"("PersonID"),
+    FOREIGN KEY("AthletePersonID") REFERENCES "ATHLETE"("PersonID")
+);
+INSERT INTO "COACH_NOTE" ("NoteID","CoachPersonID","AthletePersonID","NoteDate","NoteText") VALUES
+ (1,1,3,'2026-03-22','Great effort this week Charlie. Focus on controlled descent in squats to protect those knees.');
 CREATE TABLE IF NOT EXISTS "NOTE" (
     "NoteID"     INTEGER,
     "PersonID"   INTEGER NOT NULL,
