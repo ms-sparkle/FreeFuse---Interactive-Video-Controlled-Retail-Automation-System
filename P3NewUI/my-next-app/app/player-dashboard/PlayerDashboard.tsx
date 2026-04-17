@@ -9,6 +9,14 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 import BodyMapDisplay from '../components/BodyMapDisplay';
 import SearchBar from '../components/SearchBar';
+import workoutData from '@/data/workouts.json';
+
+// map for current presets to their names and the nodes they target (add more in the future as needed)
+const PRESETS_MAP: Record<string, { name: string, nodes: string[] }> = {
+    'upper-body': { name: 'Upper Body Power', nodes: ['Pectorals / Shoulders', 'Mid-Back / Lats', 'Neck / Traps'] },
+    'lower-body': { name: 'Lower Body Strength', nodes: ['Quadriceps / Hamstrings', 'Calves / Ankles'] },
+    'core-stability': { name: 'Core Stability & Flow', nodes: ['Abs / Obliques'] }
+};
 
 // ================= TYPES =================
 type Tab = 'workout' | 'soreness' | 'history' | 'profile';
@@ -155,6 +163,27 @@ export default function PlayerDashboard() {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
   const [calendarOffset, setCalendarOffset] = useState(0);
 
+    // NEW: Track selected workouts for the Active Workout session
+    const [selectedWorkouts, setSelectedWorkouts] = useState<Set<string>>(new Set());
+
+    // NEW: Track the preset selected from the WorkoutPresets page
+    const [activePreset, setActivePreset] = useState<string | null>(null);
+
+    const toggleSelectedWorkout = (workoutName: string) => {
+        setSelectedWorkouts(prev => {
+            const next = new Set(prev);
+            if (next.has(workoutName)) next.delete(workoutName);
+            else next.add(workoutName);
+            return next;
+        });
+    };
+    // NEW: Check for a selected preset when the dashboard loads
+    useEffect(() => {
+        const savedPreset = localStorage.getItem('selectedPreset');
+        if (savedPreset) {
+            setActivePreset(savedPreset);
+        }
+    }, []);
   // ================= LOGOUT =================
   const logout = async () => {
     localStorage.removeItem('session');
@@ -513,90 +542,181 @@ export default function PlayerDashboard() {
 
       {/* ── PAGE CONTENT ── */}
       <div className="flex-1 max-w-7xl mx-auto w-full px-6 py-8">
+              {/* ══ WORKOUT TAB ══ */}
+              {activeTab === 'workout' && (
+                  <div className="space-y-6">
 
-        {/* ══ WORKOUT TAB ══ */}
-        {activeTab === 'workout' && (
-          <div className="space-y-6">
+                      {/* Injury risk banner */}
+                      <div className={`rounded-xl border px-4 py-4 ${atRisk ? 'border-red-800/60 bg-red-950/30' : 'border-emerald-800/60 bg-emerald-950/30'}`}>
+                          <div className={`flex items-center gap-2 font-semibold ${atRisk ? 'text-red-300' : 'text-emerald-300'}`}>
+                              <ShieldCheck size={16} />
+                              {atRisk ? 'Injury Risk Detected' : 'Good Recovery Status'}
+                          </div>
+                          <p className={`text-sm mt-1 ${atRisk ? 'text-red-200/90' : 'text-emerald-200/90'}`}>
+                              {atRisk
+                                  ? 'Review your soreness and follow the modified workout plan below.'
+                                  : 'Your muscles are recovering well. You can proceed with normal training.'}
+                          </p>
+                          {latestReport && (
+                              <div className="flex gap-4 mt-3 text-xs">
+                                  <span className="text-slate-400">Progress score: <span className="text-white font-semibold">{latestReport.ProgressScore}</span></span>
+                                  <span className="text-slate-400">Injury risk: <span className={`font-semibold ${atRisk ? 'text-red-300' : 'text-emerald-300'}`}>{latestReport.InjuryRiskScore}</span></span>
+                                  <span className="text-slate-400">Last check-in: <span className="text-white font-semibold">{latestReport.ReportDate}</span></span>
+                              </div>
+                          )}
+                      </div>
 
-            {/* Injury risk banner */}
-            <div className={`rounded-xl border px-4 py-4 ${atRisk ? 'border-red-800/60 bg-red-950/30' : 'border-emerald-800/60 bg-emerald-950/30'}`}>
-              <div className={`flex items-center gap-2 font-semibold ${atRisk ? 'text-red-300' : 'text-emerald-300'}`}>
-                <ShieldCheck size={16} />
-                {atRisk ? 'Injury Risk Detected' : 'Good Recovery Status'}
-              </div>
-              <p className={`text-sm mt-1 ${atRisk ? 'text-red-200/90' : 'text-emerald-200/90'}`}>
-                {atRisk
-                  ? 'Review your soreness and follow the modified workout plan below.'
-                  : 'Your muscles are recovering well. You can proceed with normal training.'}
-              </p>
-              {latestReport && (
-                <div className="flex gap-4 mt-3 text-xs">
-                  <span className="text-slate-400">Progress score: <span className="text-white font-semibold">{latestReport.ProgressScore}</span></span>
-                  <span className="text-slate-400">Injury risk: <span className={`font-semibold ${atRisk ? 'text-red-300' : 'text-emerald-300'}`}>{latestReport.InjuryRiskScore}</span></span>
-                  <span className="text-slate-400">Last check-in: <span className="text-white font-semibold">{latestReport.ReportDate}</span></span>
-                </div>
-              )}
-            </div>
+                      {/* Customize Workout */}
+                      <section className="bg-slate-900 p-5 rounded-xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                          <div>
+                              <h2 className="text-lg font-semibold text-cyan-300 flex items-center gap-2">
+                                  <Settings size={18} />
+                                  Customize Your Workout
+                              </h2>
+                              <p className="text-slate-400 text-sm mt-1">Create or modify your own workout presets.</p>
+                          </div>
+                          <button
+                              onClick={() => router.push('/workout-presets')}
+                              className="shrink-0 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-semibold text-sm transition-colors"
+                          >
+                              Go to Presets
+                          </button>
+                      </section>
 
-            {/* Log Workout */}
-            <section className="bg-slate-900 p-4 rounded-xl border border-slate-800">
-              <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                <Dumbbell size={18} className="text-cyan-400" /> Log Workout
-              </h2>
-              {exercises.length === 0 ? (
-                <p className="text-slate-500 text-sm">No exercises available.</p>
-              ) : (
-                <div className="flex gap-3">
-                  <select
-                    value={workoutId ?? ''}
-                    onChange={(e) => setWorkoutId(Number(e.target.value))}
-                    className="bg-slate-800 border border-slate-700 p-2 rounded-lg text-white text-sm"
-                  >
-                    {exercises.map(e => (
-                      <option key={e.ExerciseID} value={e.ExerciseID}>{e.Name} ({e.TargetMuscle})</option>
-                    ))}
-                  </select>
-                  <input
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Notes..."
-                    className="bg-slate-800 border border-slate-700 p-2 rounded-lg flex-1 text-sm text-white"
-                  />
-                  <button onClick={logWorkout} className="bg-cyan-500 hover:bg-cyan-400 px-4 py-2 rounded-lg text-black font-semibold text-sm transition-colors">
-                    Log
-                  </button>
-                </div>
-              )}
-            </section>
+                      {/* Workout Recommendations */}
+                      <section>
+                          <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-4">
+                              <Dumbbell size={18} />
+                              Workout Recommendations
+                              <span className="text-xs text-slate-500 font-normal ml-1">Based on your check-in</span>
+                          </h2>
+                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                              {workoutSuggestions.length === 0 ? (
+                                  <p className="text-slate-500 text-sm col-span-3">No recommendations yet — complete a check-in first.</p>
+                              ) : workoutSuggestions.map((item) => {
+                                  const isSelected = selectedWorkouts.has(item.WorkoutName);
+                                  return (
+                                      <div key={item.WorkoutName} className={`rounded-xl border p-5 transition-colors ${isSelected ? 'border-cyan-500 bg-cyan-950/20' : 'border-slate-800 bg-slate-900'}`}>
+                                          <div className="flex items-center justify-between mb-3">
+                                              <h3 className="font-semibold">{item.WorkoutName}</h3>
+                                              <span className="px-2 py-0.5 rounded-full text-xs border bg-cyan-500/15 text-cyan-300 border-cyan-500/40">
+                                                  {item.BodyPartName}
+                                              </span>
+                                          </div>
+                                          <p className="text-slate-400 text-sm mb-4">{item.Reps} reps · {item.Duration} min</p>
+                                          <button
+                                              onClick={() => toggleSelectedWorkout(item.WorkoutName)}
+                                              className={`w-full inline-flex items-center justify-center gap-2 rounded-lg font-semibold py-2.5 transition-colors ${isSelected
+                                                      ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30'
+                                                      : 'bg-slate-800 text-white hover:bg-slate-700 border border-slate-700'
+                                                  }`}
+                                          >
+                                              {isSelected ? 'Remove Workout' : '+ Add to Routine'}
+                                          </button>
+                                      </div>
+                                  );
+                              })}
+                          </div>
+                      </section>
 
-            {/* Workout Recommendations */}
-            <section>
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-4">
-                <Dumbbell size={18} />
-                Workout Recommendations
-                <span className="text-xs text-slate-500 font-normal ml-1">Based on your check-in</span>
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {workoutSuggestions.length === 0 ? (
-                  <p className="text-slate-500 text-sm col-span-3">No recommendations yet — complete a check-in first.</p>
-                ) : workoutSuggestions.map((item) => (
-                  <div key={item.WorkoutName} className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-semibold">{item.WorkoutName}</h3>
-                      <span className="px-2 py-0.5 rounded-full text-xs border bg-cyan-500/15 text-cyan-300 border-cyan-500/40">
-                        {item.BodyPartName}
-                      </span>
-                    </div>
-                    <p className="text-slate-400 text-sm mb-4">{item.Reps} reps · {item.Duration} min</p>
-                    <button className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-semibold py-2.5 transition-colors">
-                      <Target size={16} />
-                      Start Workout
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
+                      {/* Current Workout Staging Area */}
+                      <section className="mt-8">
+                          <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-4">
+                              <Target size={18} />
+                              Current Workout Plan
+                          </h2>
 
+                          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+                              {selectedWorkouts.size === 0 && !activePreset ? (
+                                  <p className="text-slate-500 text-sm">No workouts or protocols added yet. Add some from above to get started.</p>
+                              ) : (
+                                  <div className="space-y-3">
+                                      {/* Show the Preset and its exercises if added */}
+                                      {activePreset && PRESETS_MAP[activePreset] && (() => {
+                                          const presetDetails = PRESETS_MAP[activePreset];
+                                          // Find all exercises that match this preset's filter nodes
+                                          const presetExercises = workoutData.exercises
+                                              .filter((ex: any) => presetDetails.nodes.some(node => ex.primary_nodes.includes(node)))
+                                              .map((ex: any) => ex.name || ex.Name); // Supports both lowercase and uppercase 'name' keys
+
+                                          return (
+                                              <div className="bg-slate-950 p-4 rounded-lg border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.1)]">
+                                                  <div className="flex items-center justify-between mb-2">
+                                                      <div>
+                                                          <span className="text-xs text-cyan-400 font-bold uppercase tracking-wider block mb-1">Active Protocol</span>
+                                                          <span className="font-semibold text-white">{presetDetails.name}</span>
+                                                      </div>
+                                                      <button
+                                                          onClick={() => { setActivePreset(null); localStorage.removeItem('selectedPreset'); }}
+                                                          className="text-red-400 hover:text-red-300 text-sm font-medium px-3 py-1 rounded hover:bg-red-400/10 transition-colors"
+                                                      >
+                                                          Remove
+                                                      </button>
+                                                  </div>
+
+                                                  {/* Show the exercises inside the protocol */}
+                                                  {presetExercises.length > 0 && (
+                                                      <div className="mt-4 pt-3 border-t border-slate-800/50">
+                                                          <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase mb-2">Included Exercises</p>
+                                                          <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                              {presetExercises.map((exName: string, idx: number) => (
+                                                                  <li key={idx} className="text-sm text-slate-300 flex items-center gap-2">
+                                                                      <span className="w-1 h-1 rounded-full bg-cyan-500/50" />
+                                                                      {exName}
+                                                                  </li>
+                                                              ))}
+                                                          </ul>
+                                                      </div>
+                                                  )}
+                                              </div>
+                                          );
+                                      })()}
+
+                                      {/* Show individual selected workouts */}
+                                      {Array.from(selectedWorkouts).map(workout => (
+                                          <div key={workout} className="flex items-center justify-between bg-slate-800/40 p-4 rounded-lg border border-slate-700">
+                                              <span className="font-medium text-slate-200">{workout}</span>
+                                              <button
+                                                  onClick={() => toggleSelectedWorkout(workout)}
+                                                  className="text-red-400 hover:text-red-300 text-sm font-medium px-3 py-1 rounded hover:bg-red-400/10 transition-colors"
+                                              >
+                                                  Remove
+                                              </button>
+                                          </div>
+                                      ))}
+                                  </div>
+                              )}
+
+                              {/* Start Active Workout Button */}
+                              {(selectedWorkouts.size > 0 || activePreset) && (
+                                  <div className="mt-6 flex justify-end border-t border-slate-800/60 pt-5">
+                                      <button
+                                          onClick={() => {
+                                              // 1. Get preset exercises
+                                              let presetEx: string[] = [];
+                                              if (activePreset && PRESETS_MAP[activePreset]) {
+                                                  const nodes = PRESETS_MAP[activePreset].nodes;
+                                                  presetEx = workoutData.exercises
+                                                      .filter((ex: any) => nodes.some(node => ex.primary_nodes.includes(node)))
+                                                      .map((ex: any) => ex.name || ex.Name);
+                                              }
+
+                                              // 2. Combine preset exercises with individually clicked exercises
+                                              const combinedWorkouts = Array.from(new Set([...presetEx, ...Array.from(selectedWorkouts)]));
+
+                                              // 3. Save the final list for the active-workout page to read
+                                              localStorage.setItem('selectedActiveWorkouts', JSON.stringify(combinedWorkouts));
+                                              router.push('/active-workout');
+                                          }}
+                                          className="px-6 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-base transition-colors flex items-center gap-2 shadow-lg shadow-cyan-500/20"
+                                      >
+                                          <Target size={20} />
+                                          Start Workout
+                                      </button>
+                                  </div>
+                              )}
+                          </div>
+                      </section>
             {/* Recent Sessions */}
             <section>
               <h2 className="flex items-center gap-2 text-lg font-semibold text-cyan-300 mb-4">
