@@ -72,9 +72,17 @@ export default function BodyMap() {
       })
       .catch(() => {/* silently ignore */});
   }, []);
+
   const [bodySide, setBodySide] = useState<'front' | 'back'>('front');
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+
+  // Clear "Must enter soreness" error once they start interacting
+  useEffect(() => {
+    if (Object.keys(sorenessData).length > 0 && submitError === "Must enter soreness to submit check-in") {
+      setSubmitError('');
+    }
+  }, [sorenessData, submitError]);
 
   const bodyData = bodySide === 'front'
     ? (bodyVariant === 'female' ? bodyFemaleFront : bodyFront)
@@ -163,6 +171,14 @@ export default function BodyMap() {
   return (
     <div className="relative flex flex-col md:flex-row gap-8 items-center justify-center p-8 bg-slate-950 min-h-[600px] text-white">
       
+      {/* SKIP CHECK-IN BUTTON */}
+      <button
+        onClick={() => router.push('/player-dashboard')}
+        className="absolute top-6 right-6 z-50 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-lg border border-slate-700 transition-colors shadow-sm"
+      >
+        Skip Check-In
+      </button>
+
       {/* --- THE BODY MAP --- */}
       <div className="relative w-[300px] h-[600px]">
         <div className="absolute -top-4 right-0 flex items-center gap-2">

@@ -12,6 +12,8 @@ import { User,
   UserMinus, 
   ChevronLeft } from 'lucide-react';
 import RestrictWorkouts from '../components/RestrictWorkouts';
+import { WorkoutSuggestionCard, AddToTrainingPlanModal, JsonWorkout } from '../components/TrainingPlanModal';
+import workoutsData from '@/data/workouts.json';
 
 type Athlete = {
   PersonID: number;
@@ -130,6 +132,8 @@ export default function CoachDashboard() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [isManagingRoster, setIsManagingRoster] = useState(false);
   const [coachPersonId, setCoachPersonId] = useState<number | null>(null);
+  const [showAddWorkoutModal, setShowAddWorkoutModal] = useState(false);
+  const allJsonWorkouts = workoutsData.exercises as JsonWorkout[];
 
   const logout = async () => {
     localStorage.removeItem('session');
@@ -438,23 +442,30 @@ export default function CoachDashboard() {
 
               {/* 2. Workout suggestions */}
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                <h3 className="text-slate-400 text-sm uppercase font-bold mb-6">Suggested Session Plan</h3>
-
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-slate-400 text-sm uppercase font-bold">Suggested Session Plan</h3>
+                  <button
+                    onClick={() => setShowAddWorkoutModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-black text-xs font-bold transition-colors"
+                  >
+                    <Plus size={13} />
+                    Add workout
+                  </button>
+                </div>
                 <div className="space-y-4">
-                  {detail.workoutSuggestions.length === 0 ? (
-                    <p className="text-slate-500 text-sm">No workout suggestions available</p>
-                  ) : (
-                    detail.workoutSuggestions.map((w, idx) => (
-                      <div key={idx} className="flex items-center gap-3 text-white bg-slate-800 p-3 rounded border-l-4 border-cyan-500">
-                        <ArrowRight className="text-cyan-500 w-4 h-4 shrink-0" />
-                        <div className="flex-1">
-                          <div className="font-bold text-cyan-400">{w.WorkoutName}</div>
-                          <div className="text-xs text-slate-400">Targets: {w.BodyPartName} · {w.Duration} min</div>
-                        </div>
-                        <div className="font-mono text-sm">{w.Reps} reps</div>
-                      </div>
-                    ))
-                  )}
+                  {allJsonWorkouts.slice(0, 3).map((w, idx) => (
+                    <WorkoutSuggestionCard
+                      key={idx}
+                      workout={{
+                        WorkoutName: w.name,
+                        Duration: 20,
+                        Reps: 15,
+                        BodyPartName: w.primary_nodes.join(', '),
+                      }}
+                      athleteId={selectedId!}
+                      allWorkouts={allJsonWorkouts}
+                    />
+                  ))}
                 </div>
               </div>
               {coachPersonId && selectedId && (
@@ -543,6 +554,15 @@ export default function CoachDashboard() {
                   ))}
                 </div>
               )}
+              {showAddWorkoutModal && selectedId && (
+              <AddToTrainingPlanModal
+                athleteId={selectedId}
+                allWorkouts={allJsonWorkouts}
+                preselected={null}
+                onClose={() => setShowAddWorkoutModal(false)}
+                onSuccess={() => setShowAddWorkoutModal(false)}
+              />
+            )}
             </div>
 
           </div>
