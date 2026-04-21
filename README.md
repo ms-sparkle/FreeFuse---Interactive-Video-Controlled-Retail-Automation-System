@@ -19,6 +19,12 @@ Then, install recharts
 npm install recharts
 ```
 
+Then, install SQLite
+
+```bash
+npm install better-sqlite3
+```
+
 Then, to run the development server:
 
 ```bash
@@ -29,6 +35,12 @@ yarn dev
 pnpm dev
 # or
 bun dev
+```
+
+If you run into issues after launching (slowness/crashing) run the following command in your terminal and then run the development server again:
+
+```bash
+rm -rf .next
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
