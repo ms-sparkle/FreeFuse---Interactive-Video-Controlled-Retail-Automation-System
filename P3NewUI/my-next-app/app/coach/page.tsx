@@ -147,6 +147,7 @@ export default function CoachDashboard() {
   const [savingCoachNote, setSavingCoachNote] = useState(false);
   const [editingCoachNoteId, setEditingCoachNoteId] = useState<number | null>(null);
   const [editingCoachNoteText, setEditingCoachNoteText] = useState('');
+  const [coachNoteModalOpen, setCoachNoteModalOpen] = useState(false);
 
   // Load roster on mount using session coachId
   useEffect(() => {
@@ -470,25 +471,47 @@ export default function CoachDashboard() {
 
             {/* Coach Notes */}
             <div className="mt-10 bg-slate-900 border border-slate-800 rounded-2xl p-6">
-              <h3 className="text-slate-400 text-sm uppercase font-bold mb-4">Notes for {detail.player.FirstName}</h3>
-              <div className="mb-4">
-                <textarea
-                  value={coachNoteText}
-                  onChange={e => setCoachNoteText(e.target.value)}
-                  placeholder={`Write a note for ${detail.player.FirstName}…`}
-                  rows={3}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-cyan-500"
-                />
-                <div className="flex justify-end mt-2">
-                  <button
-                    onClick={addCoachNote}
-                    disabled={savingCoachNote || !coachNoteText.trim()}
-                    className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-semibold text-sm transition-colors"
-                  >
-                    {savingCoachNote ? 'Saving…' : 'Add Note'}
-                  </button>
-                </div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-slate-400 text-sm uppercase font-bold">Notes for {detail.player.FirstName}</h3>
+                <button
+                  onClick={() => setCoachNoteModalOpen(true)}
+                  className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black text-sm font-semibold transition-colors"
+                >
+                  + Add Note
+                </button>
               </div>
+
+              {/* Add Note Modal */}
+              {coachNoteModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                  <div className="w-full max-w-md mx-4 rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+                    <h3 className="text-base font-semibold text-cyan-300 mb-4">Note for {detail.player.FirstName}</h3>
+                    <textarea
+                      value={coachNoteText}
+                      onChange={e => setCoachNoteText(e.target.value)}
+                      placeholder={`Write a note for ${detail.player.FirstName}…`}
+                      rows={5}
+                      autoFocus
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-cyan-500"
+                    />
+                    <div className="flex justify-end gap-2 mt-4">
+                      <button
+                        onClick={() => { setCoachNoteModalOpen(false); setCoachNoteText(''); }}
+                        className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:text-white text-sm transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={async () => { await addCoachNote(); setCoachNoteModalOpen(false); }}
+                        disabled={savingCoachNote || !coachNoteText.trim()}
+                        className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-semibold text-sm transition-colors"
+                      >
+                        {savingCoachNote ? 'Saving…' : 'Save Note'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
               {coachNotes.length === 0 ? (
                 <p className="text-slate-600 text-sm">No notes yet for this athlete.</p>
               ) : (

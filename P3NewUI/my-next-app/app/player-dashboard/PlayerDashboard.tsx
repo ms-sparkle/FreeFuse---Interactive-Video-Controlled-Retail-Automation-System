@@ -8,15 +8,14 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 import BodyMapDisplay from '../components/BodyMapDisplay';
-import SearchBar from '../components/SearchBar';
 
 // ================= TYPES =================
-type Tab = 'workout' | 'soreness' | 'history' | 'profile';
+type Tab = 'workout' | 'plan' | 'soreness' | 'history' | 'profile';
 
 type Exercise = {
-  ExerciseID: number;
-  Name: string;
-  TargetMuscle: string;
+  WorkoutID: number;
+  WorkoutName: string;
+  BodyPartName: string;
 };
 
 type Coach = {
@@ -94,6 +93,124 @@ function calcAge(dob: string): number {
   let age = today.getFullYear() - birth.getFullYear();
   if (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate())) age--;
   return age;
+}
+
+// ── Inline searchable workout picker ─────────────────────────────────────────
+// ── Inline searchable workout picker with queue cards ────────────────────────
+function LogWorkoutSearch({
+  exercises,
+  onLog,
+}: {
+  exercises: Exercise[];
+  onLog: (workoutId: number, notes: string) => Promise<void>;
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const [queue, setQueue] = useState<{ workout: Exercise; notes: string; logging: boolean }[]>([]);
+
+  const filtered = query.trim()
+    ? exercises.filter(e =>
+        e.WorkoutName.toLowerCase().includes(query.toLowerCase()) ||
+        e.BodyPartName.toLowerCase().includes(query.toLowerCase())
+      )
+    : exercises;
+
+  const addToQueue = (workout: Exercise) => {
+    setQueue(prev =>
+      prev.some(q => q.workout.WorkoutID === workout.WorkoutID)
+        ? prev
+        : [...prev, { workout, notes: '', logging: false }]
+    );
+    setQuery('');
+    setOpen(false);
+  };
+
+  const removeFromQueue = (id: number) =>
+    setQueue(prev => prev.filter(q => q.workout.WorkoutID !== id));
+
+  const updateNotes = (id: number, notes: string) =>
+    setQueue(prev => prev.map(q => q.workout.WorkoutID === id ? { ...q, notes } : q));
+
+  const logItem = async (id: number) => {
+    const item = queue.find(q => q.workout.WorkoutID === id);
+    if (!item) return;
+    setQueue(prev => prev.map(q => q.workout.WorkoutID === id ? { ...q, logging: true } : q));
+    await onLog(id, item.notes);
+    setQueue(prev => prev.filter(q => q.workout.WorkoutID !== id));
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Searchable dropdown */}
+      <div className="relative">
+        <div className="flex items-center bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 gap-2 focus-within:border-cyan-500 transition-colors">
+          <Dumbbell size={15} className="text-slate-500 shrink-0" />
+          <input
+            type="text"
+            value={query}
+            onChange={e => { setQuery(e.target.value); setOpen(true); }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 150)}
+            placeholder="Quick Add Workout…"
+            className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 focus:outline-none"
+          />
+        </div>
+        {open && filtered.length > 0 && (
+          <ul className="absolute z-20 mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg max-h-52 overflow-y-auto shadow-xl">
+            {filtered.map(e => (
+              <li
+                key={e.WorkoutID}
+                onMouseDown={() => addToQueue(e)}
+                className={`flex items-center justify-between px-4 py-2.5 cursor-pointer text-sm hover:bg-slate-700 transition-colors
+                  ${queue.some(q => q.workout.WorkoutID === e.WorkoutID) ? 'text-cyan-400' : 'text-white'}`}
+              >
+                <span>{e.WorkoutName}</span>
+                <span className="text-xs text-slate-500 ml-2">{e.BodyPartName}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Queue cards */}
+      {queue.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pt-1">
+          {queue.map(({ workout, notes, logging }) => (
+            <div key={workout.WorkoutID} className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+              <div className="flex items-start justify-between mb-3">
+                <h3 className="font-semibold text-sm">{workout.WorkoutName}</h3>
+                <button
+                  onClick={() => removeFromQueue(workout.WorkoutID)}
+                  className="text-slate-600 hover:text-red-400 transition-colors ml-2 shrink-0"
+                  aria-label="Remove"
+                >
+                  ✕
+                </button>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-xs border bg-cyan-500/15 text-cyan-300 border-cyan-500/40 mb-3 inline-block">
+                {workout.BodyPartName}
+              </span>
+              <textarea
+                value={notes}
+                onChange={e => updateNotes(workout.WorkoutID, e.target.value)}
+                placeholder="Notes (optional)…"
+                rows={2}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white resize-none focus:outline-none focus:border-cyan-500 transition-colors mt-2 mb-3"
+              />
+              <button
+                onClick={() => logItem(workout.WorkoutID)}
+                disabled={logging}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-semibold py-2 text-sm transition-colors"
+              >
+                <Target size={14} />
+                {logging ? 'Logging…' : 'Log Workout'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function PlayerDashboard() {
@@ -174,11 +291,10 @@ export default function PlayerDashboard() {
       .catch(console.error)
       .finally(() => setLoading(false));
 
-    fetch('/api/exercises')
+    fetch('/api/workouts-json')
       .then(r => r.ok ? r.json() : { exercises: [] })
       .then(d => {
         setExercises(d.exercises ?? []);
-        if (d.exercises?.length > 0) setWorkoutId(d.exercises[0].ExerciseID);
       })
       .catch(console.error);
 
@@ -258,25 +374,19 @@ export default function PlayerDashboard() {
   };
 
   // ================= LOG WORKOUT =================
-  const logWorkout = async () => {
-    try {
-      const raw = localStorage.getItem('session');
-      if (!raw || !workoutId) return;
-      const session = JSON.parse(raw);
+  const logWorkout = async (wId: number, wNotes: string) => {
+    const raw = localStorage.getItem('session');
+    if (!raw) return;
+    const session = JSON.parse(raw);
 
-      const res = await fetch('/api/workout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ athleteId: session.personId, workoutId, notes }),
-      });
-      if (!res.ok) throw new Error();
-      setNotes('');
-      alert('Workout logged!');
-      const updated = await fetch(`/api/player/${session.personId}`).then(r => r.json());
-      setData(updated);
-    } catch {
-      alert('Failed to log workout.');
-    }
+    const res = await fetch('/api/workout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ athleteId: session.personId, workoutId: wId, notes: wNotes }),
+    });
+    if (!res.ok) throw new Error('Failed to log workout.');
+    const updated = await fetch(`/api/player/${session.personId}`).then(r => r.json());
+    setData(updated);
   };
 
   // ================= INVITE COACH =================
@@ -449,6 +559,7 @@ export default function PlayerDashboard() {
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'workout',  label: 'Workout',           icon: <Dumbbell size={16} /> },
+    { id: 'plan',     label: 'Workout Plan',       icon: <Target size={16} /> },
     { id: 'soreness', label: 'Soreness',           icon: <Activity size={16} /> },
     { id: 'history',  label: 'History',            icon: <CalendarDays size={16} /> },
     { id: 'profile',  label: 'Profile & Settings', icon: <User size={16} /> },
@@ -473,7 +584,7 @@ export default function PlayerDashboard() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden md:block w-64"><SearchBar /></div>
+
 
             <span className={`hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border
               ${atRisk
@@ -546,26 +657,10 @@ export default function PlayerDashboard() {
               {exercises.length === 0 ? (
                 <p className="text-slate-500 text-sm">No exercises available.</p>
               ) : (
-                <div className="flex gap-3">
-                  <select
-                    value={workoutId ?? ''}
-                    onChange={(e) => setWorkoutId(Number(e.target.value))}
-                    className="bg-slate-800 border border-slate-700 p-2 rounded-lg text-white text-sm"
-                  >
-                    {exercises.map(e => (
-                      <option key={e.ExerciseID} value={e.ExerciseID}>{e.Name} ({e.TargetMuscle})</option>
-                    ))}
-                  </select>
-                  <input
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Notes..."
-                    className="bg-slate-800 border border-slate-700 p-2 rounded-lg flex-1 text-sm text-white"
-                  />
-                  <button onClick={logWorkout} className="bg-cyan-500 hover:bg-cyan-400 px-4 py-2 rounded-lg text-black font-semibold text-sm transition-colors">
-                    Log
-                  </button>
-                </div>
+                <LogWorkoutSearch
+                  exercises={exercises}
+                  onLog={logWorkout}
+                />
               )}
             </section>
 
@@ -772,6 +867,12 @@ export default function PlayerDashboard() {
                 </div>
               )}
             </section>
+          </div>
+        )}
+
+        {/* ══ PLAN WORKOUT TAB ══ */}
+        {activeTab === 'plan' && (
+          <div className="space-y-6">
           </div>
         )}
 

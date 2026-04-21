@@ -2,7 +2,7 @@
 import { Search } from 'lucide-react';
 import { useState } from 'react';
 
-export default function SearchBar() {
+export default function SearchBar({ placeholder = 'Search...' }: { placeholder?: string }) {
   const [query, setQuery] = useState('');
 
   return (
@@ -12,7 +12,7 @@ export default function SearchBar() {
         type="text"
         value={query}
         onChange={e => setQuery(e.target.value)}
-        placeholder="Search..."
+        placeholder={placeholder}
         className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
       />
     </div>

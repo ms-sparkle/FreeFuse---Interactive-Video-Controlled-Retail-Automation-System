@@ -124,14 +124,19 @@ export async function GET(
     // Workout suggestions based on sore body parts
     const workoutSuggestions = sorenessEntries.length > 0
       ? (db.prepare(`
-          SELECT DISTINCT w.WorkoutName, w.Duration, w.Reps, bp.BodyPartName
+          SELECT DISTINCT w.WorkoutName, w.Duration, w.Reps,
+                 GROUP_CONCAT(DISTINCT bp.BodyPartName) AS BodyPartName
           FROM WORKOUT w
-          JOIN BODYPART bp ON bp.BodyPartID = w.BodyPartID
-          WHERE w.BodyPartID NOT IN (
-            SELECT se.BodyPartID FROM SORENESS_ENTRY se
+          JOIN WORKOUT_BODYPART wb ON wb.WorkoutID = w.WorkoutID AND wb.IsPrimary = 1
+          JOIN BODYPART bp ON bp.BodyPartID = wb.BodyPartID
+          WHERE w.WorkoutID NOT IN (
+            SELECT DISTINCT wb2.WorkoutID
+            FROM WORKOUT_BODYPART wb2
+            JOIN SORENESS_ENTRY se ON se.BodyPartID = wb2.BodyPartID
             JOIN SORENESS_REPORT sr ON sr.ReportID = se.ReportID
             WHERE sr.AthletePersonID = ? AND se.SorenessLevel >= 5
           )
+          GROUP BY w.WorkoutID
           LIMIT 3
         `).all(personId) as {
           WorkoutName: string;
@@ -140,9 +145,12 @@ export async function GET(
           BodyPartName: string;
         }[])
       : (db.prepare(`
-          SELECT w.WorkoutName, w.Duration, w.Reps, bp.BodyPartName
+          SELECT w.WorkoutName, w.Duration, w.Reps,
+                 GROUP_CONCAT(DISTINCT bp.BodyPartName) AS BodyPartName
           FROM WORKOUT w
-          JOIN BODYPART bp ON bp.BodyPartID = w.BodyPartID
+          JOIN WORKOUT_BODYPART wb ON wb.WorkoutID = w.WorkoutID AND wb.IsPrimary = 1
+          JOIN BODYPART bp ON bp.BodyPartID = wb.BodyPartID
+          GROUP BY w.WorkoutID
           LIMIT 3
         `).all() as {
           WorkoutName: string;
