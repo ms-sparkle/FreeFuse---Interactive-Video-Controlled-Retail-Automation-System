@@ -558,7 +558,17 @@ export default function PlayerDashboard() {
     };
 
     // Apply the parser to both the recent sessions AND the calendar history
-    const sessions = rawSessions.map(parseCustomSession);
+    // 1. Map through the parser
+    // 2. Sort so the newest date is always at index [0]
+    const sessions = rawSessions
+        .map(parseCustomSession)
+        .reverse()
+        .sort((a, b) => {
+            // This sorts by date (Newest first)
+            // If your DB has a SessionID, you could also use b.SessionID - a.SessionID
+            return new Date(b.SessionDate).getTime() - new Date(a.SessionDate).getTime();
+        });
+
     const parsedSessionHistory = sessionHistory.map(parseCustomSession);
     // -------------------------------------------------------------------
 
