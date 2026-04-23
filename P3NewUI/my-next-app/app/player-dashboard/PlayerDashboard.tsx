@@ -530,8 +530,37 @@ export default function PlayerDashboard() {
     );
   }
 
-  const { player, latestReport, sorenessEntries, workoutSuggestions, sessions } = data;
-  const atRisk = (latestReport?.InjuryRiskScore ?? 0) > 0;
+    // Rename sessions to rawSessions so we can parse them below
+    const { player, latestReport, sorenessEntries, workoutSuggestions, sessions: rawSessions } = data;
+    const atRisk = (latestReport?.InjuryRiskScore ?? 0) > 0;
+
+    // --- NEW: Parse the real name and duration from our custom notes ---
+    const parseCustomSession = (s: any) => {
+        let parsedName = s.WorkoutName;
+        let parsedDuration = s.Duration;
+        let parsedNotes = s.Notes;
+
+        // If the notes start with a bracket, intercept it!
+        if (s.Notes && s.Notes.startsWith('[')) {
+            const endBracket = s.Notes.indexOf(']');
+            if (endBracket !== -1) {
+                const header = s.Notes.substring(1, endBracket); // e.g., "Upper Body Protocol - 1 min"
+                const parts = header.split(' - ');
+                if (parts.length === 2) {
+                    parsedName = parts[0]; // "Upper Body Protocol"
+                    parsedDuration = parseInt(parts[1].replace(/[^0-9]/g, '')) || s.Duration; // Extracts the "1"
+                }
+                // Strip the bracket header out of the notes so it doesn't render twice on the UI
+                parsedNotes = s.Notes.substring(endBracket + 1).trim();
+            }
+        }
+        return { ...s, WorkoutName: parsedName, Duration: parsedDuration, Notes: parsedNotes };
+    };
+
+    // Apply the parser to both the recent sessions AND the calendar history
+    const sessions = rawSessions.map(parseCustomSession);
+    const parsedSessionHistory = sessionHistory.map(parseCustomSession);
+    // -------------------------------------------------------------------
 
   // ── Soreness history chart data ──
   const REGION_COLORS = ['#06b6d4', '#f59e0b', '#a78bfa', '#34d399', '#f87171', '#60a5fa', '#fb923c'];
@@ -554,13 +583,14 @@ export default function PlayerDashboard() {
   // ── Recent sessions chart data ──
   const chartData = [...sessions].reverse().map(s => ({ day: s.SessionDate, workout: s.WorkoutName, duration: s.Duration }));
 
-  // ── Calendar lookups ──
-  const sessionDateSet = new Set(sessionHistory.map(s => s.SessionDate));
-  const sessionsByDate: Record<string, SessionHistoryRow[]> = {};
-  sessionHistory.forEach(s => {
-    if (!sessionsByDate[s.SessionDate]) sessionsByDate[s.SessionDate] = [];
-    sessionsByDate[s.SessionDate].push(s);
-  });
+    // ── Calendar lookups ──
+    // Use parsedSessionHistory instead of sessionHistory
+    const sessionDateSet = new Set(parsedSessionHistory.map(s => s.SessionDate));
+    const sessionsByDate: Record<string, SessionHistoryRow[]> = {};
+    parsedSessionHistory.forEach(s => {
+        if (!sessionsByDate[s.SessionDate]) sessionsByDate[s.SessionDate] = [];
+        sessionsByDate[s.SessionDate].push(s);
+    });
   const sorenessHistoryByDate: Record<string, SorenessHistoryRow[]> = {};
   sorenessHistory.forEach(r => {
     if (!sorenessHistoryByDate[r.ReportDate]) sorenessHistoryByDate[r.ReportDate] = [];
@@ -851,16 +881,56 @@ export default function PlayerDashboard() {
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="mt-3 rounded-xl border border-slate-700 bg-slate-900/60 p-3">
-                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                      {sessions.map((s, i) => (
-                        <div key={i} className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm">
-                          <span className="font-medium">{s.WorkoutName}</span>
-                          <span className="text-slate-400">{s.SessionDate}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                                      {/* --- NEW: Most Recent Session Featured Card --- */}
+                                      <div className="mt-5 rounded-xl border border-cyan-500/30 bg-cyan-950/10 p-5 shadow-[0_0_15px_rgba(6,182,212,0.05)]">
+                                          <div className="flex items-start justify-between mb-4 border-b border-cyan-500/20 pb-4">
+                                              <div>
+                                                  <p className="text-[10px] font-bold text-cyan-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                                                      <CheckCircle2 size={12} /> Latest Workout
+                                                  </p>
+                                                  <h3 className="text-xl font-bold text-white">{sessions[0].WorkoutName}</h3>
+                                              </div>
+                                              <div className="text-right">
+                                                  <span className="inline-block bg-cyan-500 text-black font-bold px-3 py-1 rounded-lg text-sm mb-1 shadow-lg shadow-cyan-500/20">
+                                                      {sessions[0].Duration} min
+                                                  </span>
+                                                  <p className="text-xs text-slate-400 font-medium">{sessions[0].SessionDate}</p>
+                                              </div>
+                                          </div>
+
+                                          {/* The Formatted Notes / Receipt */}
+                                          {sessions[0].Notes ? (
+                                              <div className="bg-[#0f172a] p-4 rounded-lg border border-slate-800 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">
+                                                  {sessions[0].Notes}
+                                              </div>
+                                          ) : (
+                                              <p className="text-sm text-slate-500 italic">No detailed breakdown logged.</p>
+                                          )}
+                                      </div>
+
+                                      {/* --- OLDER SESSIONS --- */}
+                                      {sessions.length > 1 && (
+                                          <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/60 p-3">
+                                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-2 pt-1">Previous History</p>
+                                              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                                  {sessions.slice(1).map((s, i) => (
+                                                      <div key={i} className="flex flex-col rounded-lg border border-slate-800 bg-slate-900 px-4 py-3 text-sm transition-colors hover:border-slate-600">
+                                                          <div className="flex items-center justify-between mb-1">
+                                                              <span className="font-bold text-slate-300">{s.WorkoutName}</span>
+                                                              <span className="text-slate-500 text-xs font-medium">{s.SessionDate} &middot; {s.Duration} min</span>
+                                                          </div>
+
+                                                          {/* Optional: Show notes for older ones too, but smaller */}
+                                                          {s.Notes && (
+                                                              <p className="text-slate-500 text-[10px] mt-1 whitespace-pre-wrap font-mono line-clamp-2">
+                                                                  {s.Notes}
+                                                              </p>
+                                                          )}
+                                                      </div>
+                                                  ))}
+                                              </div>
+                                          </div>
+                                      )}
                 </>
               )}
             </section>
@@ -1230,18 +1300,27 @@ export default function PlayerDashboard() {
                   <div className="grid grid-cols-1 md:grid-cols-[7fr_3fr] gap-6">
                     <div>
                       <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wide mb-2">Workouts</p>
-                      {selectedSessions.length === 0 ? (
-                        <p className="text-slate-500 text-sm">No sessions logged</p>
-                      ) : (
-                        <ul className="space-y-2">
-                          {selectedSessions.map((s, i) => (
-                            <li key={i} className="text-sm">
-                              <span className="font-medium text-slate-200">{s.WorkoutName}</span>
-                              {s.Notes && <p className="text-slate-400 text-xs mt-0.5">{s.Notes}</p>}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                                  {selectedSessions.length === 0 ? (
+                                      <p className="text-slate-500 text-sm">No sessions logged</p>
+                                  ) : (
+                                      <ul className="space-y-3">
+                                          {selectedSessions.map((s, i) => (
+                                              <li key={i} className="text-sm bg-slate-950/50 border border-slate-800/60 p-3 rounded-xl">
+                                                  <div className="flex justify-between items-center mb-1">
+                                                      <span className="font-bold text-cyan-300">{s.WorkoutName}</span>
+                                                      <span className="text-xs font-bold text-slate-500 bg-slate-900 px-2 py-1 rounded">{s.Duration} min</span>
+                                                  </div>
+
+                                                  {/* NEW: Format the notes here too! */}
+                                                  {s.Notes && (
+                                                      <p className="text-slate-400 text-[11px] mt-2 whitespace-pre-wrap font-mono bg-[#0f172a] p-2.5 rounded-lg border border-slate-800">
+                                                          {s.Notes}
+                                                      </p>
+                                                  )}
+                                              </li>
+                                          ))}
+                                      </ul>
+                                  )}
                     </div>
                     <div>
                       <p className="text-xs font-semibold text-cyan-400 uppercase tracking-wide mb-2">Soreness</p>

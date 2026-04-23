@@ -80,12 +80,82 @@ function WorkoutCompanion() {
         setExerciseTimer(0);
     };
 
-    const handleFinish = () => {
+    const handleFinish = async () => {
         setIsRunning(false);
-        // In a real app, you would POST exerciseLogs and waterBreaks to your database here!
-        localStorage.removeItem('selectedActiveWorkouts');
-        localStorage.removeItem('selectedPreset');
-        router.push('/check-in');
+
+        try {
+            const rawSession = localStorage.getItem('session');
+            if (!rawSession) {
+                router.push('/check-in');
+                return;
+            }
+            const userSession = JSON.parse(rawSession);
+
+            // 1. SAFELY fetch a valid workout name directly from your database
+            const exRes = await fetch('/api/exercises');
+            let validWorkoutName = 'Squat'; // Hard fallback
+
+            if (exRes.ok) {
+                const exData = await exRes.json();
+                const backendExercises = exData.exercises || [];
+
+                // Look for the first exercise we actually did to use as the title
+                const firstLogged = exerciseLogs.length > 0 ? exerciseLogs[0].name : null;
+                const match = backendExercises.find((e: any) => e.Name === firstLogged);
+
+                if (match) {
+                    validWorkoutName = match.Name; // Use the exact name the DB expects
+                } else if (backendExercises.length > 0) {
+                    validWorkoutName = backendExercises[0].Name; // Bypass with first available DB entry
+                }
+            }
+
+            // 2. Format the custom routine name
+            const rawPreset = localStorage.getItem('selectedPreset');
+            const routineName = rawPreset
+                ? rawPreset.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+                : 'Custom Routine';
+
+            const totalMinutes = Math.max(1, Math.floor(timeElapsed / 60));
+
+            // 3. Build the detailed receipt
+            const exerciseBreakdown = exerciseLogs.map(log =>
+                `• ${log.name}: ${formatTime(log.duration)}`
+            ).join('\n');
+
+            const breaks = waterBreaks.length > 0
+                ? `\nBreaks taken: ${waterBreaks.length}`
+                : '\nNo breaks taken.';
+
+            const detailedNotes = `[${routineName} Protocol - ${totalMinutes} min]\n\nExercise Breakdown:\n${exerciseBreakdown}\n${breaks}`;
+
+            // 4. Send the payload with a GUARANTEED VALID name
+            const saveRes = await fetch('/api/workout-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    athletePersonId: userSession.personId,
+                    workoutName: validWorkoutName, // <--- This keeps the database happy!
+                    duration: totalMinutes,
+                    notes: detailedNotes           // <--- This keeps the UI looking cool!
+                }),
+            });
+
+            if (!saveRes.ok) {
+                const errText = await saveRes.text();
+                alert(`Backend Error! The database rejected the save: ${errText}`);
+                return;
+            }
+
+            // 5. If successful, clear storage and route
+            localStorage.removeItem('selectedActiveWorkouts');
+            localStorage.removeItem('selectedPreset');
+            router.push('/check-in');
+
+        } catch (error) {
+            console.error("Failed to log active session to database:", error);
+            alert(`Network error: ${error}`);
+        }
     };
 
     const progressPercentage = activeExercises.length > 0
@@ -245,13 +315,18 @@ function WorkoutCompanion() {
                                         <div className={`text-xl font-bold ${isDone ? 'line-through' : isActive ? 'text-white' : ''}`}>
                                             {ex.name}
                                         </div>
-                                        {ex.type && (
-                                            <div className="text-sm flex gap-2 font-mono mt-1">
-                                                <span className={`px-2 py-0.5 rounded text-[10px] uppercase ${isActive ? 'bg-cyan-500/20 text-cyan-300' : 'bg-black/30'}`}>
+                                        <div className="text-sm flex flex-wrap gap-2 font-mono mt-2">
+                                            {ex.type && (
+                                                <span className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wider ${isActive ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' : 'bg-black/30 border border-slate-700/50'}`}>
                                                     {ex.type}
                                                 </span>
-                                            </div>
-                                        )}
+                                            )}
+
+                                            {/* NEW: Sets and Reps Display */}
+                                            <span className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wider ${isActive ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-black/30 border border-slate-700/50'}`}>
+                                                {ex.sets || 3} Sets × {ex.reps || 10} Reps
+                                            </span>
+                                        </div>
                                     </div>
 
                                     {/* Secondary Timer (Only shows on active exercise) */}
