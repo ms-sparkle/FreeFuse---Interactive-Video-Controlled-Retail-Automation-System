@@ -12,376 +12,377 @@ import { SvgMaleWrapper } from './SvgMaleWrapper';
 const BODYMAP_SCALE = 1.5;
 
 type SorenessRecord = {
-  [key: string]: number;
+    [key: string]: number;
 };
 
 // Helper to get readable muscle name
 const getMuscleName = (slug: string): string => {
-  const names: Record<string, string> = {
-    'chest': 'Chest',
-    'abs': 'Abs',
-    'quadriceps': 'Quadriceps',
-    'biceps': 'Biceps',
-    'deltoids': 'Shoulders',
-    'calves': 'Calves',
-    'triceps': 'Triceps',
-    'obliques': 'Obliques',
-    'forearm': 'Forearms',
-    'neck': 'Neck',
-    'trapezius': 'Trapezius',
-    'adductors': 'Adductors',
-    'tibialis': 'Tibialis',
-    'knees': 'Knees',
-    'hands': 'Hands',
-    'ankles': 'Ankles',
-    'feet': 'Feet',
-    'upper-back': 'Upper Back',
-    'lower-back': 'Lower Back',
-    'gluteal': 'Glutes',
-    'hamstring': 'Hamstrings',
-    'head': 'Head',
-    'hair': 'Hair'
-  };
-  return names[slug] || slug;
+    const names: Record<string, string> = {
+        'chest': 'Chest',
+        'abs': 'Abs',
+        'quadriceps': 'Quadriceps',
+        'biceps': 'Biceps',
+        'deltoids': 'Shoulders',
+        'calves': 'Calves',
+        'triceps': 'Triceps',
+        'obliques': 'Obliques',
+        'forearm': 'Forearms',
+        'neck': 'Neck',
+        'trapezius': 'Trapezius',
+        'adductors': 'Adductors',
+        'tibialis': 'Tibialis',
+        'knees': 'Knees',
+        'hands': 'Hands',
+        'ankles': 'Ankles',
+        'feet': 'Feet',
+        'upper-back': 'Upper Back',
+        'lower-back': 'Lower Back',
+        'gluteal': 'Glutes',
+        'hamstring': 'Hamstrings',
+        'head': 'Head',
+        'hair': 'Hair'
+    };
+    return names[slug] || slug;
 };
 
-export default function BodyMap() {
-  const router = useRouter();
-  const [sorenessData, setSorenessData] = useState<SorenessRecord>({});
-  const [activeMuscle, setActiveMuscle] = useState<string | null>(null);
-  const [hoveredMuscle, setHoveredMuscle] = useState<string | null>(null);
-  const [currentLevel, setCurrentLevel] = useState(5);
-  const [bodyVariant, setBodyVariant] = useState<'female' | 'male'>('male');
+// 👇 ADDED THE PROPS RECEPTION HERE 👇
+export default function BodyMap({ sex }: { sex?: string | null }) {
+    const router = useRouter();
+    const [sorenessData, setSorenessData] = useState<SorenessRecord>({});
+    const [activeMuscle, setActiveMuscle] = useState<string | null>(null);
+    const [hoveredMuscle, setHoveredMuscle] = useState<string | null>(null);
+    const [currentLevel, setCurrentLevel] = useState(5);
 
-  useEffect(() => {
-    fetch('/api/auth/session')
-      .then(r => r.ok ? r.json() : null)
-      .then(session => {
-        if (session?.sex) {
-          setBodyVariant(session.sex.toLowerCase() === 'male' ? 'male' : 'female');
+    // 👇 INITIALIZE BASED ON PROP 👇
+    const [bodyVariant, setBodyVariant] = useState<'female' | 'male'>(
+        sex?.toLowerCase() === 'female' ? 'female' : 'male'
+    );
+
+    // 👇 UPDATE INSTANTLY IF THE PROP CHANGES DURING LOADING 👇
+    useEffect(() => {
+        if (sex) {
+            setBodyVariant(sex.toLowerCase() === 'female' ? 'female' : 'male');
         }
-      });
+    }, [sex]);
 
-    // Pre-populate with any soreness already logged today
-    fetch('/api/check-in')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (d?.sorenessData && Object.keys(d.sorenessData).length > 0) {
-          setSorenessData(d.sorenessData);
+    useEffect(() => {
+        // Pre-populate with any soreness already logged today
+        fetch('/api/check-in')
+            .then(r => r.ok ? r.json() : null)
+            .then(d => {
+                if (d?.sorenessData && Object.keys(d.sorenessData).length > 0) {
+                    setSorenessData(d.sorenessData);
+                }
+            })
+            .catch(() => {/* silently ignore */ });
+    }, []);
+
+    const [bodySide, setBodySide] = useState<'front' | 'back'>('front');
+    const [submitting, setSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState('');
+
+    // Clear "Must enter soreness" error once they start interacting
+    useEffect(() => {
+        if (Object.keys(sorenessData).length > 0 && submitError === "Must enter soreness to submit check-in") {
+            setSubmitError('');
         }
-      })
-      .catch(() => {/* silently ignore */});
-  }, []);
+    }, [sorenessData, submitError]);
 
-  const [bodySide, setBodySide] = useState<'front' | 'back'>('front');
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState('');
+    const bodyData = bodySide === 'front'
+        ? (bodyVariant === 'female' ? bodyFemaleFront : bodyFront)
+        : (bodyVariant === 'female' ? bodyFemaleBack : bodyBack);
 
-  // Clear "Must enter soreness" error once they start interacting
-  useEffect(() => {
-    if (Object.keys(sorenessData).length > 0 && submitError === "Must enter soreness to submit check-in") {
-      setSubmitError('');
-    }
-  }, [sorenessData, submitError]);
+    const Wrapper = bodyVariant === 'female' ? SvgFemaleWrapper : SvgMaleWrapper;
 
-  const bodyData = bodySide === 'front'
-    ? (bodyVariant === 'female' ? bodyFemaleFront : bodyFront)
-    : (bodyVariant === 'female' ? bodyFemaleBack : bodyBack);
-
-  const Wrapper = bodyVariant === 'female' ? SvgFemaleWrapper : SvgMaleWrapper;
-
-  const saveSoreness = () => {
-    if (activeMuscle) {
-      setSorenessData(prev => ({
-        ...prev,
-        [activeMuscle]: currentLevel
-      }));
-      setActiveMuscle(null);
-    }
-  };
-
-  const submitCheckIn = async () => {
-    const sessionRes = await fetch('/api/auth/session');
-    if (!sessionRes.ok) { setSubmitError('Not logged in'); return; }
-    const session = await sessionRes.json();
-    setSubmitting(true);
-    setSubmitError('');
-
-    // Build complete soreness map: all muscle slugs defaulting to 0
-    const allBodyData = [bodyFront, bodyBack, bodyFemaleFront, bodyFemaleBack];
-    const completeSorenessData: SorenessRecord = {};
-    for (const dataset of allBodyData) {
-      for (const muscle of dataset) {
-        if (muscle.slug === 'hair' || muscle.slug === 'head') continue;
-        if (muscle.path.common?.length) {
-          if (!(muscle.slug in completeSorenessData)) completeSorenessData[muscle.slug] = 0;
+    const saveSoreness = () => {
+        if (activeMuscle) {
+            setSorenessData(prev => ({
+                ...prev,
+                [activeMuscle]: currentLevel
+            }));
+            setActiveMuscle(null);
         }
-        if (muscle.path.left?.length) {
-          const key = `${muscle.slug}_left`;
-          if (!(key in completeSorenessData)) completeSorenessData[key] = 0;
+    };
+
+    const submitCheckIn = async () => {
+        const sessionRes = await fetch('/api/auth/session');
+        if (!sessionRes.ok) { setSubmitError('Not logged in'); return; }
+        const session = await sessionRes.json();
+        setSubmitting(true);
+        setSubmitError('');
+
+        // Build complete soreness map: all muscle slugs defaulting to 0
+        const allBodyData = [bodyFront, bodyBack, bodyFemaleFront, bodyFemaleBack];
+        const completeSorenessData: SorenessRecord = {};
+        for (const dataset of allBodyData) {
+            for (const muscle of dataset) {
+                if (muscle.slug === 'hair' || muscle.slug === 'head') continue;
+                if (muscle.path.common?.length) {
+                    if (!(muscle.slug in completeSorenessData)) completeSorenessData[muscle.slug] = 0;
+                }
+                if (muscle.path.left?.length) {
+                    const key = `${muscle.slug}_left`;
+                    if (!(key in completeSorenessData)) completeSorenessData[key] = 0;
+                }
+                if (muscle.path.right?.length) {
+                    const key = `${muscle.slug}_right`;
+                    if (!(key in completeSorenessData)) completeSorenessData[key] = 0;
+                }
+            }
         }
-        if (muscle.path.right?.length) {
-          const key = `${muscle.slug}_right`;
-          if (!(key in completeSorenessData)) completeSorenessData[key] = 0;
+        // Overlay user-entered values
+        const finalSorenessData = { ...completeSorenessData, ...sorenessData };
+
+        try {
+            const res = await fetch('/api/check-in', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ athletePersonId: session.personId, sorenessData: finalSorenessData }),
+            });
+            if (!res.ok) {
+                const d = await res.json();
+                setSubmitError(d.error ?? 'Submission failed');
+                return;
+            }
+            router.push('/player-dashboard');
+        } catch {
+            setSubmitError('Network error – please try again');
+        } finally {
+            setSubmitting(false);
         }
-      }
-    }
-    // Overlay user-entered values
-    const finalSorenessData = { ...completeSorenessData, ...sorenessData };
+    };
 
-    try {
-      const res = await fetch('/api/check-in', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ athletePersonId: session.personId, sorenessData: finalSorenessData }),
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        setSubmitError(d.error ?? 'Submission failed');
-        return;
-      }
-      router.push('/player-dashboard');
-    } catch {
-      setSubmitError('Network error – please try again');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    // Helper to determine color based on soreness level
+    const getMuscleColor = (muscleId: string) => {
+        const level = sorenessData[muscleId];
+        if (!level) return "#334155"; // Default Slate-700 (Inactive)
+        if (level < 4) return "#22c55e"; // Green (Low)
+        if (level < 7) return "#eab308"; // Yellow (Medium)
+        return "#ef4444"; // Red (High)
+    };
 
-  // Helper to determine color based on soreness level
-  const getMuscleColor = (muscleId: string) => {
-    const level = sorenessData[muscleId];
-    if (!level) return "#334155"; // Default Slate-700 (Inactive)
-    if (level < 4) return "#22c55e"; // Green (Low)
-    if (level < 7) return "#eab308"; // Yellow (Medium)
-    return "#ef4444"; // Red (High)
-  };
-  
-  const handleMuscleClickWithSide = (slug: string, side?: 'left' | 'right' | 'common') => {
-    const fullId = side && side !== 'common' ? `${slug}_${side}` : slug;
-    setActiveMuscle(fullId);
-    setCurrentLevel(sorenessData[fullId] || 5);
-  };
+    const handleMuscleClickWithSide = (slug: string, side?: 'left' | 'right' | 'common') => {
+        const fullId = side && side !== 'common' ? `${slug}_${side}` : slug;
+        setActiveMuscle(fullId);
+        setCurrentLevel(sorenessData[fullId] || 5);
+    };
 
-  const handleMuscleHoverWithSide = (slug: string, side?: 'left' | 'right' | 'common') => {
-    const fullId = side && side !== 'common' ? `${slug}_${side}` : slug;
-    setHoveredMuscle(fullId);
-  };
+    const handleMuscleHoverWithSide = (slug: string, side?: 'left' | 'right' | 'common') => {
+        const fullId = side && side !== 'common' ? `${slug}_${side}` : slug;
+        setHoveredMuscle(fullId);
+    };
 
-  return (
-    <div className="relative flex flex-col md:flex-row gap-8 items-center justify-center p-8 bg-slate-950 min-h-[600px] text-white">
-      
-      {/* SKIP CHECK-IN BUTTON */}
-      <button
-        onClick={() => router.push('/player-dashboard')}
-        className="absolute top-6 right-6 z-50 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-lg border border-slate-700 transition-colors shadow-sm"
-      >
-        Skip Check-In
-      </button>
+    return (
+        <div className="relative flex flex-col md:flex-row gap-8 items-center justify-center p-8 bg-slate-950 min-h-[600px] text-white">
 
-      {/* --- THE BODY MAP --- */}
-      <div className="relative w-[300px] h-[600px]">
-        <div className="absolute -top-4 right-0 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setBodySide(prev => (prev === 'front' ? 'back' : 'front'))}
-            className="px-3 py-1 text-xs uppercase tracking-widest bg-slate-800 text-slate-200 hover:bg-slate-700 rounded-full border border-slate-700"
-          >
-            {bodySide === 'front' ? 'Switch to Back View' : 'Switch to Front View'}
-          </button>
-
-        </div>
-        <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10 px-3 py-1 text-xs uppercase tracking-widest bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded-full">
-          {bodySide === 'front' ? 'Front View' : 'Back View'}
-        </div>
-        <Wrapper
-          scale={BODYMAP_SCALE}
-          side={bodySide}
-          border="none"
-          className="drop-shadow-2xl"
-        >
-          <g>
-            {/* Render Muscles */}
-            {bodyData.map((muscle) => {
-              // Skip hair and head for cleaner visualization
-              if (muscle.slug === 'hair' || muscle.slug === 'head') return null;
-              
-              return (
-                <g key={muscle.slug}>
-                  {/* Optional hit areas (invisible, larger click targets) */}
-                  {muscle.hitPath?.common?.map((pathData, idx) => (
-                    <path
-                      key={`${muscle.slug}-hit-common-${idx}`}
-                      d={pathData}
-                      onClick={() => handleMuscleClickWithSide(muscle.slug, 'common')}
-                      onMouseEnter={() => handleMuscleHoverWithSide(muscle.slug, 'common')}
-                      onMouseLeave={() => setHoveredMuscle(null)}
-                      fill="transparent"
-                      stroke="transparent"
-                      pointerEvents="all"
-                      className="cursor-pointer"
-                    />
-                  ))}
-                  {muscle.hitPath?.left?.map((pathData, idx) => (
-                    <path
-                      key={`${muscle.slug}-hit-left-${idx}`}
-                      d={pathData}
-                      onClick={() => handleMuscleClickWithSide(muscle.slug, 'left')}
-                      onMouseEnter={() => handleMuscleHoverWithSide(muscle.slug, 'left')}
-                      onMouseLeave={() => setHoveredMuscle(null)}
-                      fill="transparent"
-                      stroke="transparent"
-                      pointerEvents="all"
-                      className="cursor-pointer"
-                    />
-                  ))}
-                  {muscle.hitPath?.right?.map((pathData, idx) => (
-                    <path
-                      key={`${muscle.slug}-hit-right-${idx}`}
-                      d={pathData}
-                      onClick={() => handleMuscleClickWithSide(muscle.slug, 'right')}
-                      onMouseEnter={() => handleMuscleHoverWithSide(muscle.slug, 'right')}
-                      onMouseLeave={() => setHoveredMuscle(null)}
-                      fill="transparent"
-                      stroke="transparent"
-                      pointerEvents="all"
-                      className="cursor-pointer"
-                    />
-                  ))}
-
-                  {/* Common path (for symmetric parts like neck) */}
-                  {muscle.path.common?.map((pathData, idx) => (
-                    <path
-                      key={`${muscle.slug}-common-${idx}`}
-                      d={pathData}
-                      onClick={() => handleMuscleClickWithSide(muscle.slug, 'common')}
-                      onMouseEnter={() => handleMuscleHoverWithSide(muscle.slug, 'common')}
-                      onMouseLeave={() => setHoveredMuscle(null)}
-                      pointerEvents="bounding-box"
-                      fill={getMuscleColor(muscle.slug)}
-                      stroke="white"
-                      strokeWidth="2"
-                      className={`cursor-pointer transition-all duration-200 ${
-                        hoveredMuscle === muscle.slug ? 'opacity-100 brightness-110' : 'opacity-85'
-                      }`}
-                    />
-                  ))}
-                  
-                  {/* Left side paths */}
-                  {muscle.path.left?.map((pathData, idx) => (
-                    <path
-                      key={`${muscle.slug}-left-${idx}`}
-                      d={pathData}
-                      onClick={() => handleMuscleClickWithSide(muscle.slug, 'left')}
-                      onMouseEnter={() => handleMuscleHoverWithSide(muscle.slug, 'left')}
-                      onMouseLeave={() => setHoveredMuscle(null)}
-                      pointerEvents="bounding-box"
-                      fill={getMuscleColor(`${muscle.slug}_left`)}
-                      stroke="white"
-                      strokeWidth="2"
-                      className={`cursor-pointer transition-all duration-200 ${
-                        hoveredMuscle === `${muscle.slug}_left` ? 'opacity-100 brightness-110' : 'opacity-85'
-                      }`}
-                    />
-                  ))}
-                  
-                  {/* Right side paths */}
-                  {muscle.path.right?.map((pathData, idx) => (
-                    <path
-                      key={`${muscle.slug}-right-${idx}`}
-                      d={pathData}
-                      onClick={() => handleMuscleClickWithSide(muscle.slug, 'right')}
-                      onMouseEnter={() => handleMuscleHoverWithSide(muscle.slug, 'right')}
-                      onMouseLeave={() => setHoveredMuscle(null)}
-                      pointerEvents="bounding-box"
-                      fill={getMuscleColor(`${muscle.slug}_right`)}
-                      stroke="white"
-                      strokeWidth="2"
-                      className={`cursor-pointer transition-all duration-200 ${
-                        hoveredMuscle === `${muscle.slug}_right` ? 'opacity-100 brightness-110' : 'opacity-85'
-                      }`}
-                    />
-                  ))}
-                </g>
-              );
-            })}
-          </g>
-        </Wrapper>
-        
-        {/* Helper Text */}
-        <p className="text-center text-slate-500 mt-4 text-sm uppercase tracking-widest">
-          Tap muscle to log
-        </p>
-      </div>
-
-      {/* --- THE INTERACTION PANEL (Popup/Sidebar) --- */}
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl h-fit">
-        {activeMuscle ? (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <h2 className="text-2xl font-bold mb-1 text-cyan-400">
-              {(() => {
-                // Extract base slug and side from active muscle (e.g., "chest_left" -> "chest")
-                const baseSlug = activeMuscle.includes('_') ? activeMuscle.split('_')[0] : activeMuscle;
-                const side = activeMuscle.includes('_left') ? ' (Left)' : activeMuscle.includes('_right') ? ' (Right)' : '';
-                return getMuscleName(baseSlug) + side;
-              })()}
-            </h2>
-            <p className="text-slate-400 mb-6 text-sm">Rate your soreness level</p>
-
-            {/* The Soreness Counter/Slider */}
-            <div className="flex items-center justify-between mb-2">
-               <span className="text-xs font-bold text-green-500">FRESH (1)</span>
-               <span className="text-xs font-bold text-red-500">PAIN (10)</span>
-            </div>
-            
-            <input
-              type="range"
-              min="1"
-              max="10"
-              value={currentLevel}
-              onChange={(e) => setCurrentLevel(Number(e.target.value))}
-              className="w-full h-3 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500 mb-6"
-            />
-
-            <div className="flex justify-between items-end mb-6">
-               <div className="text-6xl font-thin text-white">{currentLevel}</div>
-               <div className="text-sm text-slate-500 pb-2">Intensity Score</div>
-            </div>
-
+            {/* SKIP CHECK-IN BUTTON */}
             <button
-              onClick={saveSoreness}
-              className="w-full py-4 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded-lg transition-colors"
+                onClick={() => router.push('/player-dashboard')}
+                className="absolute top-6 right-6 z-50 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-lg border border-slate-700 transition-colors shadow-sm"
             >
-              Save Status
+                Skip Check-In
             </button>
-            <button 
-              onClick={() => setActiveMuscle(null)}
-              className="w-full mt-3 py-2 text-slate-500 hover:text-white text-sm"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          /* Empty State */
-          <div className="text-center py-10 opacity-50">
-            <div className="text-4xl mb-4">👆</div>
-            <h3 className="text-xl font-semibold">Select a Muscle</h3>
-            <p className="text-sm mt-2">Click on the body map to begin check-in.</p>
-          </div>
-        )}
-      </div>
 
-      <div className="absolute bottom-6 right-6 flex flex-col items-end gap-2">
-        {submitError && <p className="text-red-400 text-sm">{submitError}</p>}
-        <button
-          onClick={submitCheckIn}
-          disabled={submitting}
-          className="px-5 py-3 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black font-bold rounded-lg transition-colors shadow-lg"
-        >
-          {submitting ? 'Submitting…' : 'Submit Check-In'}
-        </button>
-      </div>
+            {/* --- THE BODY MAP --- */}
+            <div className="relative w-[300px] h-[600px]">
+                <div className="absolute -top-4 right-0 flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setBodySide(prev => (prev === 'front' ? 'back' : 'front'))}
+                        className="px-3 py-1 text-xs uppercase tracking-widest bg-slate-800 text-slate-200 hover:bg-slate-700 rounded-full border border-slate-700"
+                    >
+                        {bodySide === 'front' ? 'Switch to Back View' : 'Switch to Front View'}
+                    </button>
 
-    </div>
-  );
+                </div>
+                <div className="absolute top-8 left-1/2 -translate-x-1/2 z-10 px-3 py-1 text-xs uppercase tracking-widest bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded-full">
+                    {bodySide === 'front' ? 'Front View' : 'Back View'}
+                </div>
+                <Wrapper
+                    scale={BODYMAP_SCALE}
+                    side={bodySide}
+                    border="none"
+                    className="drop-shadow-2xl"
+                >
+                    <g>
+                        {/* Render Muscles */}
+                        {bodyData.map((muscle) => {
+                            // Skip hair and head for cleaner visualization
+                            if (muscle.slug === 'hair' || muscle.slug === 'head') return null;
+
+                            return (
+                                <g key={muscle.slug}>
+                                    {/* Optional hit areas (invisible, larger click targets) */}
+                                    {muscle.hitPath?.common?.map((pathData, idx) => (
+                                        <path
+                                            key={`${muscle.slug}-hit-common-${idx}`}
+                                            d={pathData}
+                                            onClick={() => handleMuscleClickWithSide(muscle.slug, 'common')}
+                                            onMouseEnter={() => handleMuscleHoverWithSide(muscle.slug, 'common')}
+                                            onMouseLeave={() => setHoveredMuscle(null)}
+                                            fill="transparent"
+                                            stroke="transparent"
+                                            pointerEvents="all"
+                                            className="cursor-pointer"
+                                        />
+                                    ))}
+                                    {muscle.hitPath?.left?.map((pathData, idx) => (
+                                        <path
+                                            key={`${muscle.slug}-hit-left-${idx}`}
+                                            d={pathData}
+                                            onClick={() => handleMuscleClickWithSide(muscle.slug, 'left')}
+                                            onMouseEnter={() => handleMuscleHoverWithSide(muscle.slug, 'left')}
+                                            onMouseLeave={() => setHoveredMuscle(null)}
+                                            fill="transparent"
+                                            stroke="transparent"
+                                            pointerEvents="all"
+                                            className="cursor-pointer"
+                                        />
+                                    ))}
+                                    {muscle.hitPath?.right?.map((pathData, idx) => (
+                                        <path
+                                            key={`${muscle.slug}-hit-right-${idx}`}
+                                            d={pathData}
+                                            onClick={() => handleMuscleClickWithSide(muscle.slug, 'right')}
+                                            onMouseEnter={() => handleMuscleHoverWithSide(muscle.slug, 'right')}
+                                            onMouseLeave={() => setHoveredMuscle(null)}
+                                            fill="transparent"
+                                            stroke="transparent"
+                                            pointerEvents="all"
+                                            className="cursor-pointer"
+                                        />
+                                    ))}
+
+                                    {/* Common path (for symmetric parts like neck) */}
+                                    {muscle.path.common?.map((pathData, idx) => (
+                                        <path
+                                            key={`${muscle.slug}-common-${idx}`}
+                                            d={pathData}
+                                            onClick={() => handleMuscleClickWithSide(muscle.slug, 'common')}
+                                            onMouseEnter={() => handleMuscleHoverWithSide(muscle.slug, 'common')}
+                                            onMouseLeave={() => setHoveredMuscle(null)}
+                                            pointerEvents="bounding-box"
+                                            fill={getMuscleColor(muscle.slug)}
+                                            stroke="white"
+                                            strokeWidth="2"
+                                            className={`cursor-pointer transition-all duration-200 ${hoveredMuscle === muscle.slug ? 'opacity-100 brightness-110' : 'opacity-85'
+                                                }`}
+                                        />
+                                    ))}
+
+                                    {/* Left side paths */}
+                                    {muscle.path.left?.map((pathData, idx) => (
+                                        <path
+                                            key={`${muscle.slug}-left-${idx}`}
+                                            d={pathData}
+                                            onClick={() => handleMuscleClickWithSide(muscle.slug, 'left')}
+                                            onMouseEnter={() => handleMuscleHoverWithSide(muscle.slug, 'left')}
+                                            onMouseLeave={() => setHoveredMuscle(null)}
+                                            pointerEvents="bounding-box"
+                                            fill={getMuscleColor(`${muscle.slug}_left`)}
+                                            stroke="white"
+                                            strokeWidth="2"
+                                            className={`cursor-pointer transition-all duration-200 ${hoveredMuscle === `${muscle.slug}_left` ? 'opacity-100 brightness-110' : 'opacity-85'
+                                                }`}
+                                        />
+                                    ))}
+
+                                    {/* Right side paths */}
+                                    {muscle.path.right?.map((pathData, idx) => (
+                                        <path
+                                            key={`${muscle.slug}-right-${idx}`}
+                                            d={pathData}
+                                            onClick={() => handleMuscleClickWithSide(muscle.slug, 'right')}
+                                            onMouseEnter={() => handleMuscleHoverWithSide(muscle.slug, 'right')}
+                                            onMouseLeave={() => setHoveredMuscle(null)}
+                                            pointerEvents="bounding-box"
+                                            fill={getMuscleColor(`${muscle.slug}_right`)}
+                                            stroke="white"
+                                            strokeWidth="2"
+                                            className={`cursor-pointer transition-all duration-200 ${hoveredMuscle === `${muscle.slug}_right` ? 'opacity-100 brightness-110' : 'opacity-85'
+                                                }`}
+                                        />
+                                    ))}
+                                </g>
+                            );
+                        })}
+                    </g>
+                </Wrapper>
+
+                {/* Helper Text */}
+                <p className="text-center text-slate-500 mt-4 text-sm uppercase tracking-widest">
+                    Tap muscle to log
+                </p>
+            </div>
+
+            {/* --- THE INTERACTION PANEL (Popup/Sidebar) --- */}
+            <div className="w-full max-w-md bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl h-fit">
+                {activeMuscle ? (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                        <h2 className="text-2xl font-bold mb-1 text-cyan-400">
+                            {(() => {
+                                // Extract base slug and side from active muscle (e.g., "chest_left" -> "chest")
+                                const baseSlug = activeMuscle.includes('_') ? activeMuscle.split('_')[0] : activeMuscle;
+                                const side = activeMuscle.includes('_left') ? ' (Left)' : activeMuscle.includes('_right') ? ' (Right)' : '';
+                                return getMuscleName(baseSlug) + side;
+                            })()}
+                        </h2>
+                        <p className="text-slate-400 mb-6 text-sm">Rate your soreness level</p>
+
+                        {/* The Soreness Counter/Slider */}
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-bold text-green-500">FRESH (1)</span>
+                            <span className="text-xs font-bold text-red-500">PAIN (10)</span>
+                        </div>
+
+                        <input
+                            type="range"
+                            min="1"
+                            max="10"
+                            value={currentLevel}
+                            onChange={(e) => setCurrentLevel(Number(e.target.value))}
+                            className="w-full h-3 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500 mb-6"
+                        />
+
+                        <div className="flex justify-between items-end mb-6">
+                            <div className="text-6xl font-thin text-white">{currentLevel}</div>
+                            <div className="text-sm text-slate-500 pb-2">Intensity Score</div>
+                        </div>
+
+                        <button
+                            onClick={saveSoreness}
+                            className="w-full py-4 bg-cyan-500 hover:bg-cyan-400 text-black font-bold rounded-lg transition-colors"
+                        >
+                            Save Status
+                        </button>
+                        <button
+                            onClick={() => setActiveMuscle(null)}
+                            className="w-full mt-3 py-2 text-slate-500 hover:text-white text-sm"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                ) : (
+                    /* Empty State */
+                    <div className="text-center py-10 opacity-50">
+                        <div className="text-4xl mb-4">👆</div>
+                        <h3 className="text-xl font-semibold">Select a Muscle</h3>
+                        <p className="text-sm mt-2">Click on the body map to begin check-in.</p>
+                    </div>
+                )}
+            </div>
+
+            <div className="absolute bottom-6 right-6 flex flex-col items-end gap-2">
+                {submitError && <p className="text-red-400 text-sm">{submitError}</p>}
+                <button
+                    onClick={submitCheckIn}
+                    disabled={submitting}
+                    className="px-5 py-3 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black font-bold rounded-lg transition-colors shadow-lg"
+                >
+                    {submitting ? 'Submitting…' : 'Submit Check-In'}
+                </button>
+            </div>
+
+        </div>
+    );
 }

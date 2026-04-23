@@ -1,5 +1,4 @@
 "use client";
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Activity, AlertTriangle, CalendarDays, ChevronDown, Dumbbell, LogOut,
@@ -10,6 +9,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import BodyMapDisplay from '../components/BodyMapDisplay';
 import SearchBar from '../components/SearchBar';
 import workoutData from '@/data/workouts.json';
+import { useEffect, useState, useMemo } from 'react';
 
 // map for current presets to their names and the nodes they target (add more in the future as needed)
 const PRESETS_MAP: Record<string, { name: string, nodes: string[] }> = {
@@ -169,6 +169,10 @@ export default function PlayerDashboard() {
     // NEW: Track the preset selected from the WorkoutPresets page
     const [activePreset, setActivePreset] = useState<string | null>(null);
 
+    // NEW: Track exercises explicitly removed from the active preset due to soreness
+    const [removedPresetExercises, setRemovedPresetExercises] = useState<Set<string>>(new Set());
+
+
     const toggleSelectedWorkout = (workoutName: string) => {
         setSelectedWorkouts(prev => {
             const next = new Set(prev);
@@ -285,7 +289,97 @@ export default function PlayerDashboard() {
       alert('Failed to delete note.');
     }
   };
+    // 1. Calculate all exercises included in the current preset
+    const presetEx = useMemo(() => {
+        if (!activePreset || typeof PRESETS_MAP === 'undefined' || !PRESETS_MAP[activePreset]) return [];
+        const nodes = PRESETS_MAP[activePreset].nodes;
+        return workoutData.exercises
+            .filter((ex: any) => nodes.some(node => ex.primary_nodes?.includes(node)))
+            .map((ex: any) => ex.name || ex.Name);
+    }, [activePreset]);
 
+    // 2. Filter out the ones the user explicitly removed
+    const activePresetExercises = presetEx.filter(ex => !removedPresetExercises.has(ex));
+
+    // 3. Combine remaining preset exercises with manually added ones
+    const combinedWorkouts = Array.from(new Set([...activePresetExercises, ...Array.from(selectedWorkouts)]));
+
+    // 4. Shared sore parts (Muscles with level 5+ soreness)
+    const soreParts = useMemo(() => {
+        if (!data?.sorenessEntries) return [];
+
+        // Maps the BodyMap UI names to your workouts.json target names
+        const muscleAliases: Record<string, string> = {
+            'chest': 'pectoral',
+            'shoulders': 'deltoid',
+            'abs': 'oblique',
+            'upper back': 'lat',
+            'glutes': 'gluteal'
+        };
+
+        return data.sorenessEntries
+            .filter(e => e.SorenessLevel >= 5)
+            .flatMap(e => {
+                // Get the raw name (e.g., "chest")
+                const rawName = e.BodyPartName.toLowerCase().replace(/s$/, '');
+                // Find the alias (e.g., "pectoral")
+                const alias = muscleAliases[rawName];
+
+                return alias ? [rawName, alias] : [rawName];
+            });
+    }, [data?.sorenessEntries]);
+
+    // 5. Generate dynamic removal recommendations
+    const removalRecommendations = useMemo(() => {
+        const recs: { workoutName: string, reason: string }[] = [];
+        combinedWorkouts.forEach(workoutName => {
+            const exDetail = workoutData.exercises.find((ex: any) => (ex.name || ex.Name) === workoutName);
+            if (exDetail) {
+                const targets = [
+                    ...(exDetail.primary_nodes || []),
+                    exDetail.TargetMuscle
+                ].filter(Boolean).map((s: string) => s.toLowerCase());
+
+                const matchingSorePart = soreParts.find(sore =>
+                    targets.some(t => t.includes(sore) || sore.includes(t))
+                );
+
+                if (matchingSorePart) {
+                    recs.push({ workoutName, reason: matchingSorePart });
+                }
+            }
+        });
+        return recs;
+    }, [combinedWorkouts, soreParts]);
+
+    // 6. NEW: Generate SMART Add Recommendations from your JSON
+    const smartAddRecommendations = useMemo(() => {
+        // Filter out exercises that are already staged OR hit a sore muscle
+        const safeExercises = workoutData.exercises.filter((ex: any) => {
+            // Already staged? Skip it.
+            if (combinedWorkouts.includes(ex.name || ex.Name)) return false;
+
+            // Hits a sore muscle? Skip it.
+            const targets = [
+                ...(ex.primary_nodes || []),
+                ex.TargetMuscle
+            ].filter(Boolean).map((s: string) => s.toLowerCase());
+
+            const hitsSoreMuscle = soreParts.some(sore =>
+                targets.some(t => t.includes(sore) || sore.includes(t))
+            );
+
+            return !hitsSoreMuscle;
+        });
+
+        // Pick the first 3 safe exercises and format them for the UI
+        return safeExercises.slice(0, 3).map((ex: any) => ({
+            WorkoutName: ex.name || ex.Name,
+            BodyPartName: ex.primary_nodes?.[0] || ex.TargetMuscle || 'General',
+            Reps: ex.reps || 10,       // Fallback to 10 if your JSON lacks reps
+            Duration: ex.duration || 15 // Fallback to 15 if your JSON lacks duration
+        }));
+    }, [combinedWorkouts, soreParts]);
   // ================= LOG WORKOUT =================
   const logWorkout = async () => {
     try {
@@ -590,32 +684,56 @@ export default function PlayerDashboard() {
                               Workout Recommendations
                               <span className="text-xs text-slate-500 font-normal ml-1">Based on your check-in</span>
                           </h2>
+
                           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                              {workoutSuggestions.length === 0 ? (
-                                  <p className="text-slate-500 text-sm col-span-3">No recommendations yet — complete a check-in first.</p>
-                              ) : workoutSuggestions.map((item) => {
-                                  const isSelected = selectedWorkouts.has(item.WorkoutName);
-                                  return (
-                                      <div key={item.WorkoutName} className={`rounded-xl border p-5 transition-colors ${isSelected ? 'border-cyan-500 bg-cyan-950/20' : 'border-slate-800 bg-slate-900'}`}>
-                                          <div className="flex items-center justify-between mb-3">
-                                              <h3 className="font-semibold">{item.WorkoutName}</h3>
-                                              <span className="px-2 py-0.5 rounded-full text-xs border bg-cyan-500/15 text-cyan-300 border-cyan-500/40">
-                                                  {item.BodyPartName}
-                                              </span>
-                                          </div>
-                                          <p className="text-slate-400 text-sm mb-4">{item.Reps} reps · {item.Duration} min</p>
-                                          <button
-                                              onClick={() => toggleSelectedWorkout(item.WorkoutName)}
-                                              className={`w-full inline-flex items-center justify-center gap-2 rounded-lg font-semibold py-2.5 transition-colors ${isSelected
-                                                      ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30'
-                                                      : 'bg-slate-800 text-white hover:bg-slate-700 border border-slate-700'
-                                                  }`}
-                                          >
-                                              {isSelected ? 'Remove Workout' : '+ Add to Routine'}
-                                          </button>
+                              {/* Dynamic REMOVAL Recommendations (Red Cards) */}
+                              {removalRecommendations.map(rec => (
+                                  <div key={rec.workoutName} className="rounded-xl border border-red-800/50 bg-red-950/20 p-5 transition-colors">
+                                      <div className="flex items-center justify-between mb-3">
+                                          <h3 className="font-semibold text-red-200">{rec.workoutName}</h3>
+                                          <span className="px-2 py-0.5 rounded-full text-xs border bg-red-500/15 text-red-300 border-red-500/40 capitalize">
+                                              {rec.reason} Soreness
+                                          </span>
                                       </div>
-                                  );
-                              })}
+                                      <p className="text-slate-400 text-sm mb-4">High soreness detected. Recommended to remove from today's routine.</p>
+                                      <button
+                                          onClick={() => {
+                                              // 1. Remove from manual selections if it's there
+                                              if (selectedWorkouts.has(rec.workoutName)) {
+                                                  toggleSelectedWorkout(rec.workoutName);
+                                              }
+                                              // 2. Mark as removed from preset if it came from the protocol
+                                              if (presetEx.includes(rec.workoutName)) {
+                                                  setRemovedPresetExercises(prev => new Set(prev).add(rec.workoutName));
+                                              }
+                                          }}
+                                          className="w-full inline-flex items-center justify-center gap-2 rounded-lg font-semibold py-2.5 transition-colors bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30"
+                                      >
+                                          - Remove from Routine
+                                      </button>
+                                  </div>
+                              ))}
+
+                              {/* Standard ADD Recommendations (Now 100% dynamic and injury-safe) */}
+                              {smartAddRecommendations.length === 0 && removalRecommendations.length === 0 ? (
+                                  <p className="text-slate-500 text-sm col-span-3">No safe recommendations available based on current soreness.</p>
+                              ) : smartAddRecommendations.map((item) => (
+                                  <div key={item.WorkoutName} className="rounded-xl border border-slate-800 bg-slate-900 p-5 transition-colors">
+                                      <div className="flex items-center justify-between mb-3">
+                                          <h3 className="font-semibold">{item.WorkoutName}</h3>
+                                          <span className="px-2 py-0.5 rounded-full text-xs border bg-cyan-500/15 text-cyan-300 border-cyan-500/40">
+                                              {item.BodyPartName}
+                                          </span>
+                                      </div>
+                                      <p className="text-slate-400 text-sm mb-4">{item.Reps} reps · {item.Duration} min</p>
+                                      <button
+                                          onClick={() => toggleSelectedWorkout(item.WorkoutName)}
+                                          className="w-full inline-flex items-center justify-center gap-2 rounded-lg font-semibold py-2.5 transition-colors bg-slate-800 text-white hover:bg-slate-700 border border-slate-700"
+                                      >
+                                          + Add to Routine
+                                      </button>
+                                  </div>
+                              ))}
                           </div>
                       </section>
 
@@ -627,52 +745,51 @@ export default function PlayerDashboard() {
                           </h2>
 
                           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-                              {selectedWorkouts.size === 0 && !activePreset ? (
+                              {combinedWorkouts.length === 0 && !activePreset ? (
                                   <p className="text-slate-500 text-sm">No workouts or protocols added yet. Add some from above to get started.</p>
                               ) : (
                                   <div className="space-y-3">
                                       {/* Show the Preset and its exercises if added */}
-                                      {activePreset && PRESETS_MAP[activePreset] && (() => {
-                                          const presetDetails = PRESETS_MAP[activePreset];
-                                          // Find all exercises that match this preset's filter nodes
-                                          const presetExercises = workoutData.exercises
-                                              .filter((ex: any) => presetDetails.nodes.some(node => ex.primary_nodes.includes(node)))
-                                              .map((ex: any) => ex.name || ex.Name); // Supports both lowercase and uppercase 'name' keys
-
-                                          return (
-                                              <div className="bg-slate-950 p-4 rounded-lg border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.1)]">
-                                                  <div className="flex items-center justify-between mb-2">
-                                                      <div>
-                                                          <span className="text-xs text-cyan-400 font-bold uppercase tracking-wider block mb-1">Active Protocol</span>
-                                                          <span className="font-semibold text-white">{presetDetails.name}</span>
-                                                      </div>
-                                                      <button
-                                                          onClick={() => { setActivePreset(null); localStorage.removeItem('selectedPreset'); }}
-                                                          className="text-red-400 hover:text-red-300 text-sm font-medium px-3 py-1 rounded hover:bg-red-400/10 transition-colors"
-                                                      >
-                                                          Remove
-                                                      </button>
+                                      {activePreset && PRESETS_MAP[activePreset] && (
+                                          <div className="bg-slate-950 p-4 rounded-lg border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.1)]">
+                                              <div className="flex items-center justify-between mb-2">
+                                                  <div>
+                                                      <span className="text-xs text-cyan-400 font-bold uppercase tracking-wider block mb-1">Active Protocol</span>
+                                                      <span className="font-semibold text-white">{PRESETS_MAP[activePreset].name}</span>
                                                   </div>
-
-                                                  {/* Show the exercises inside the protocol */}
-                                                  {presetExercises.length > 0 && (
-                                                      <div className="mt-4 pt-3 border-t border-slate-800/50">
-                                                          <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase mb-2">Included Exercises</p>
-                                                          <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                              {presetExercises.map((exName: string, idx: number) => (
-                                                                  <li key={idx} className="text-sm text-slate-300 flex items-center gap-2">
-                                                                      <span className="w-1 h-1 rounded-full bg-cyan-500/50" />
-                                                                      {exName}
-                                                                  </li>
-                                                              ))}
-                                                          </ul>
-                                                      </div>
-                                                  )}
+                                                  <button
+                                                      onClick={() => {
+                                                          setActivePreset(null);
+                                                          localStorage.removeItem('selectedPreset');
+                                                          setRemovedPresetExercises(new Set()); // Reset removals when protocol is dropped
+                                                      }}
+                                                      className="text-red-400 hover:text-red-300 text-sm font-medium px-3 py-1 rounded hover:bg-red-400/10 transition-colors"
+                                                  >
+                                                      Remove Protocol
+                                                  </button>
                                               </div>
-                                          );
-                                      })()}
 
-                                      {/* Show individual selected workouts */}
+                                              {presetEx.length > 0 && (
+                                                  <div className="mt-4 pt-3 border-t border-slate-800/50">
+                                                      <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase mb-2">Included Exercises</p>
+                                                      <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                          {presetEx.map((exName: string, idx: number) => {
+                                                              const isRemoved = removedPresetExercises.has(exName);
+                                                              return (
+                                                                  <li key={idx} className={`text-sm flex items-center gap-2 ${isRemoved ? 'text-slate-600 line-through' : 'text-slate-300'}`}>
+                                                                      <span className={`w-1 h-1 rounded-full ${isRemoved ? 'bg-slate-700' : 'bg-cyan-500/50'}`} />
+                                                                      {exName}
+                                                                      {isRemoved && <span className="text-[10px] text-red-500 ml-auto no-underline tracking-wider uppercase font-bold">Removed</span>}
+                                                                  </li>
+                                                              );
+                                                          })}
+                                                      </ul>
+                                                  </div>
+                                              )}
+                                          </div>
+                                      )}
+
+                                      {/* Show individual manually selected workouts */}
                                       {Array.from(selectedWorkouts).map(workout => (
                                           <div key={workout} className="flex items-center justify-between bg-slate-800/40 p-4 rounded-lg border border-slate-700">
                                               <span className="font-medium text-slate-200">{workout}</span>
@@ -688,23 +805,11 @@ export default function PlayerDashboard() {
                               )}
 
                               {/* Start Active Workout Button */}
-                              {(selectedWorkouts.size > 0 || activePreset) && (
+                              {combinedWorkouts.length > 0 && (
                                   <div className="mt-6 flex justify-end border-t border-slate-800/60 pt-5">
                                       <button
                                           onClick={() => {
-                                              // 1. Get preset exercises
-                                              let presetEx: string[] = [];
-                                              if (activePreset && PRESETS_MAP[activePreset]) {
-                                                  const nodes = PRESETS_MAP[activePreset].nodes;
-                                                  presetEx = workoutData.exercises
-                                                      .filter((ex: any) => nodes.some(node => ex.primary_nodes.includes(node)))
-                                                      .map((ex: any) => ex.name || ex.Name);
-                                              }
-
-                                              // 2. Combine preset exercises with individually clicked exercises
-                                              const combinedWorkouts = Array.from(new Set([...presetEx, ...Array.from(selectedWorkouts)]));
-
-                                              // 3. Save the final list for the active-workout page to read
+                                              // Pass ONLY the combined/filtered workouts to the active page
                                               localStorage.setItem('selectedActiveWorkouts', JSON.stringify(combinedWorkouts));
                                               router.push('/active-workout');
                                           }}
