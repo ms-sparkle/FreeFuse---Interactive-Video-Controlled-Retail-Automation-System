@@ -78,28 +78,28 @@ function SearchableDropdown<T>({
       <button
         type="button"
         onClick={() => { setOpen((o) => !o); setQuery(""); }}
-        className="w-full flex items-center justify-between bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-left focus:outline-none focus:border-cyan-500 hover:border-slate-500 transition-colors"
+        className="w-full flex items-center justify-between bg-[#2a1200] border border-amber-800/60 rounded-lg px-3 py-2 text-sm text-left focus:outline-none focus:border-amber-500 hover:border-amber-700 transition-colors"
       >
-        <span className={selected ? "text-white" : "text-slate-500"}>
+        <span className={selected ? "text-yellow-50" : "text-yellow-50/50"}>
           {selected ? getLabel(selected) : placeholder}
         </span>
-        <ChevronDown size={14} className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown size={14} className={`text-yellow-50/50 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full bg-slate-800 border border-slate-700 rounded-lg shadow-2xl overflow-hidden">
-          <div className="p-2 border-b border-slate-700">
+        <div className="absolute z-50 mt-1 w-full bg-[#2a1200] border border-amber-800/60 rounded-lg shadow-2xl overflow-hidden">
+          <div className="p-2 border-b border-amber-800/60">
             <input
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Type to filter…"
-              className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+              className="w-full bg-[#120700] border border-amber-800/60 rounded px-3 py-1.5 text-sm text-yellow-50 placeholder-yellow-50/40 focus:outline-none focus:border-amber-500"
             />
           </div>
           <ul className="max-h-48 overflow-y-auto">
             {filtered.length === 0 && (
-              <li className="px-3 py-2 text-slate-500 text-sm">No matches</li>
+              <li className="px-3 py-2 text-yellow-50/50 text-sm">No matches</li>
             )}
             {filtered.map((item) => (
               <li key={String(getValue(item))}>
@@ -109,8 +109,8 @@ function SearchableDropdown<T>({
                     onChange(getValue(item), item);
                     setOpen(false);
                   }}
-                  className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-700 transition-colors
-                    ${getValue(item) === value ? "text-cyan-400 bg-slate-700/60" : "text-slate-200"}`}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-amber-900/40 transition-colors
+                    ${getValue(item) === value ? "text-amber-400 bg-amber-900/40" : "text-yellow-50"}`}
                 >
                   {getLabel(item)}
                 </button>
@@ -158,17 +158,17 @@ function MiniCalendar({
   }
 
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-xl p-3 select-none">
+    <div className="bg-[#2a1200] border border-amber-800/60 rounded-xl p-3 select-none">
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
-        <button type="button" onClick={prev} className="text-slate-400 hover:text-white px-1 text-sm transition-colors">‹</button>
-        <span className="text-xs font-semibold text-slate-300">{MONTH_NAMES[month]} {year}</span>
-        <button type="button" onClick={next} className="text-slate-400 hover:text-white px-1 text-sm transition-colors">›</button>
+        <button type="button" onClick={prev} className="text-yellow-50/60 hover:text-white px-1 text-sm transition-colors">‹</button>
+        <span className="text-xs font-semibold text-yellow-50">{MONTH_NAMES[month]} {year}</span>
+        <button type="button" onClick={next} className="text-yellow-50/60 hover:text-white px-1 text-sm transition-colors">›</button>
       </div>
       {/* Day labels */}
       <div className="grid grid-cols-7 gap-0.5 text-center mb-1">
         {DAY_LABELS.map(d => (
-          <div key={d} className="text-[9px] text-slate-600 font-medium">{d}</div>
+          <div key={d} className="text-[9px] text-yellow-50/30 font-medium">{d}</div>
         ))}
       </div>
       {/* Cells */}
@@ -187,10 +187,10 @@ function MiniCalendar({
               disabled={isPast}
               onClick={() => onChange(isSelected ? null : dateStr)}
               className={`text-[11px] h-6 w-full rounded transition-colors
-                ${isPast ? "text-slate-700 cursor-not-allowed" : ""}
-                ${isSelected ? "bg-cyan-500 text-black font-bold" : ""}
-                ${isToday && !isSelected ? "ring-1 ring-cyan-500 text-cyan-400" : ""}
-                ${!isPast && !isSelected ? "text-slate-300 hover:bg-slate-700" : ""}
+                ${isPast ? "text-yellow-50/20 cursor-not-allowed" : ""}
+                ${isSelected ? "bg-amber-500 text-black font-bold" : ""}
+                ${isToday && !isSelected ? "ring-1 ring-amber-500 text-amber-400" : ""}
+                ${!isPast && !isSelected ? "text-yellow-50 hover:bg-amber-900/40" : ""}
               `}
             >
               {day}
@@ -257,15 +257,15 @@ function AddBanModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto">
+      <div className="bg-[#1a0c00] border border-amber-800/50 w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto">
 
         {/* Header */}
-        <div className="p-5 border-b border-slate-800 flex justify-between items-center sticky top-0 bg-slate-900 z-10">
+        <div className="p-5 border-b border-amber-800/50 flex justify-between items-center sticky top-0 bg-[#1a0c00] z-10">
           <h3 className="text-base font-bold flex items-center gap-2 text-white">
             <Ban className="text-red-400" size={16} />
             Add Workout Restriction
           </h3>
-          <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
+          <button onClick={onClose} className="text-yellow-50/60 hover:text-white transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -274,7 +274,7 @@ function AddBanModal({
 
           {/* Ban type toggle */}
           <div>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
+            <label className="text-xs font-bold text-yellow-50/60 uppercase tracking-widest mb-2 block">
               Restrict by
             </label>
             <div className="flex gap-2">
@@ -285,8 +285,8 @@ function AddBanModal({
                   onClick={() => { setBanType(type); setWorkoutId(null); setMuscleGroup(null); }}
                   className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-all
                     ${banType === type
-                      ? "bg-cyan-600 border-cyan-500 text-black"
-                      : "bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-500"
+                      ? "bg-amber-600 border-amber-500 text-black"
+                      : "bg-[#2a1200] border-amber-800/60 text-yellow-50/70 hover:border-amber-700"
                     }`}
                 >
                   {type === "workout" ? "Specific Workout" : "Muscle Group"}
@@ -298,7 +298,7 @@ function AddBanModal({
           {/* Workout selector */}
           {banType === "workout" && (
             <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
+              <label className="text-xs font-bold text-yellow-50/60 uppercase tracking-widest mb-2 block">
                 Select Workout
               </label>
               <SearchableDropdown
@@ -315,7 +315,7 @@ function AddBanModal({
           {/* Muscle group selector */}
           {banType === "muscle" && (
             <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
+              <label className="text-xs font-bold text-yellow-50/60 uppercase tracking-widest mb-2 block">
                 Ban workouts that target
               </label>
               <SearchableDropdown
@@ -327,8 +327,8 @@ function AddBanModal({
                 placeholder="Select muscle group…"
               />
               {muscleGroup && (
-                <p className="text-xs text-slate-500 mt-2">
-                  All workouts targeting <span className="text-cyan-400">{muscleGroup}</span> (primary &amp; secondary) will be restricted.
+                <p className="text-xs text-yellow-50/60 mt-2">
+                  All workouts targeting <span className="text-amber-400">{muscleGroup}</span> (primary &amp; secondary) will be restricted.
                 </p>
               )}
             </div>
@@ -336,7 +336,7 @@ function AddBanModal({
 
           {/* Expiration */}
           <div>
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
+            <label className="text-xs font-bold text-yellow-50/60 uppercase tracking-widest mb-2 block">
               Expiration
             </label>
             <label className="flex items-center gap-2 mb-3 cursor-pointer group">
@@ -344,16 +344,16 @@ function AddBanModal({
                 type="checkbox"
                 checked={noExpiry}
                 onChange={(e) => { setNoExpiry(e.target.checked); if (e.target.checked) setExpiration(null); }}
-                className="w-4 h-4 accent-cyan-500 cursor-pointer"
+                className="w-4 h-4 accent-amber-500 cursor-pointer"
               />
-              <span className="text-sm text-slate-300 group-hover:text-white transition-colors">No expiration</span>
+              <span className="text-sm text-yellow-50/80 group-hover:text-white transition-colors">No expiration</span>
             </label>
 
             {!noExpiry && (
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <CalendarDays size={14} className="text-slate-500" />
-                  <span className="text-xs text-slate-400">
+                  <CalendarDays size={14} className="text-yellow-50/50" />
+                  <span className="text-xs text-yellow-50/60">
                     {expirationDate
                       ? `Expires: ${expirationDate}`
                       : "Click a date to set expiration"}
@@ -362,7 +362,7 @@ function AddBanModal({
                     <button
                       type="button"
                       onClick={() => setExpiration(null)}
-                      className="text-xs text-slate-500 hover:text-red-400 ml-auto transition-colors"
+                      className="text-xs text-yellow-50/50 hover:text-red-400 ml-auto transition-colors"
                     >
                       Clear
                     </button>
@@ -377,11 +377,11 @@ function AddBanModal({
         </div>
 
         {/* Footer */}
-        <div className="p-5 border-t border-slate-800 flex gap-3 sticky bottom-0 bg-slate-900">
+        <div className="p-5 border-t border-amber-800/50 flex gap-3 sticky bottom-0 bg-[#1a0c00]">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white transition-colors text-sm"
+            className="flex-1 py-2.5 rounded-xl border border-amber-800/60 text-yellow-50/70 hover:text-white transition-colors text-sm"
           >
             Cancel
           </button>
@@ -389,7 +389,7 @@ function AddBanModal({
             type="button"
             onClick={handleSave}
             disabled={!canSave || saving}
-            className="flex-1 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-black font-bold text-sm transition-colors"
+            className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-40 text-black font-bold text-sm transition-colors"
           >
             {saving ? "Saving…" : "Restrict Workout"}
           </button>
@@ -463,16 +463,16 @@ export default function RestrictWorkouts({
 }
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+    <div className="bg-[#2a1200]/40 border border-amber-800/40 rounded-2xl p-6">
       {/* Section header */}
       <div className="flex items-center justify-between mb-5">
-        <h3 className="text-slate-400 text-sm uppercase font-bold flex items-center gap-2">
+        <h3 className="text-yellow-50 text-sm uppercase font-bold flex items-center gap-2">
           <Ban size={14} className="text-red-400" />
           Restrict Workouts
         </h3>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-black text-xs font-bold transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-black text-xs font-bold transition-colors"
         >
           <Plus size={13} />
           Add Restriction
@@ -480,11 +480,11 @@ export default function RestrictWorkouts({
       </div>
 
       {/* Ban list */}
-      <div className="min-h-[80px] bg-slate-950 rounded-xl border border-slate-800/50 p-3 flex flex-col gap-2">
+      <div className="min-h-[80px] bg-[#120700]/70 rounded-xl border border-amber-800/30 p-3 flex flex-col gap-2">
         {loading ? (
-          <p className="text-slate-600 text-xs text-center mt-4">Loading…</p>
+          <p className="text-yellow-50/30 text-xs text-center mt-4">Loading…</p>
         ) : bans.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-16 text-slate-600 text-xs gap-1">
+          <div className="flex flex-col items-center justify-center h-16 text-yellow-50/30 text-xs gap-1">
             <Ban size={20} className="opacity-30" />
             No restricted workouts
           </div>
@@ -496,7 +496,7 @@ export default function RestrictWorkouts({
             >
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-red-300 truncate">{banLabel(ban)}</p>
-                <p className="text-[10px] text-slate-500 mt-0.5">
+                <p className="text-[10px] text-yellow-50/50 mt-0.5">
                   {ban.BanType === "muscle" ? "Muscle group ban · " : "Workout ban · "}
                   {ban.ExpirationDate
                     ? `Expires ${ban.ExpirationDate}`
@@ -508,7 +508,7 @@ export default function RestrictWorkouts({
               {/* Confirm remove inline */}
               {confirmBanId === ban.BanID ? (
                 <div className="flex items-center gap-2 ml-3 shrink-0">
-                  <span className="text-[10px] text-slate-400 max-w-[120px] leading-tight">
+                  <span className="text-[10px] text-yellow-50/60 max-w-[120px] leading-tight">
                     Remove {ban.BanType === "muscle" ? "muscle group" : "workout"} ban?
                   </span>
                   <button
@@ -519,7 +519,7 @@ export default function RestrictWorkouts({
                   </button>
                   <button
                     onClick={() => setConfirmBanId(null)}
-                    className="text-[10px] px-2 py-1 rounded border border-slate-700 text-slate-400 hover:text-white transition-colors"
+                    className="text-[10px] px-2 py-1 rounded border border-amber-800/60 text-yellow-50/60 hover:text-white transition-colors"
                   >
                     Cancel
                   </button>
@@ -527,7 +527,7 @@ export default function RestrictWorkouts({
               ) : (
                 <button
                   onClick={() => setConfirmBanId(ban.BanID)}
-                  className="ml-3 shrink-0 p-1.5 rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-400/10 transition-all"
+                  className="ml-3 shrink-0 p-1.5 rounded-lg text-yellow-50/30 hover:text-red-400 hover:bg-red-400/10 transition-all"
                   title="Remove restriction"
                 >
                   <Trash2 size={14} />

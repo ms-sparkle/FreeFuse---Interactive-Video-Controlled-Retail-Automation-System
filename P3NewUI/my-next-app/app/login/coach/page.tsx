@@ -50,13 +50,13 @@ function CoachLoginForm() {
     }
 
     return (
-        <div className="w-full max-w-md bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl">
+        <div className="w-full max-w-md bg-[#160e06] border border-amber-800/50 p-8 rounded-2xl shadow-2xl">
             <div className="flex flex-col items-center mb-8">
                 <div className="p-4 bg-amber-500/10 rounded-full mb-4">
                     <ShieldCheck className="w-10 h-10 text-amber-500" />
                 </div>
                 <h1 className="text-2xl font-bold">Coach Portal</h1>
-                <p className="text-slate-400 text-sm mt-1">Authorized Staff Only</p>
+                <p className="text-yellow-50/60 text-sm mt-1">Authorized Staff Only</p>
             </div>
 
             {registered && (
@@ -74,32 +74,32 @@ function CoachLoginForm() {
 
             <form className="space-y-5" onSubmit={handleSubmit}>
                 <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-1">Staff ID / Username</label>
+                    <label className="block text-sm font-medium text-yellow-50/60 mb-1">Staff ID / Username</label>
                     <input
                         type="text"
                         value={username}
                         onChange={e => setUsername(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
+                        className="w-full bg-[#0f0804] border border-amber-800/60 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
                         placeholder="c_smith"
                         required
                     />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-1">Password</label>
+                    <label className="block text-sm font-medium text-yellow-50/60 mb-1">Password</label>
                     <div className="relative">
                         <input
                             type={showPassword ? 'text' : 'password'}
                             value={password}
                             onChange={e => setPassword(e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 pr-11 py-3 text-white focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
+                            className="w-full bg-[#0f0804] border border-amber-800/60 rounded-lg px-4 pr-11 py-3 text-white focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
                             placeholder="********"
                             required
                         />
                         <button
                             type="button"
                             onClick={() => setShowPassword(prev => !prev)}
-                            className="absolute right-4 top-3.5 text-slate-500 hover:text-slate-300 focus:outline-none"
+                            className="absolute right-4 top-3.5 text-yellow-50/40 hover:text-yellow-50 focus:outline-none"
                             tabIndex={-1}
                         >
                             {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -121,7 +121,7 @@ function CoachLoginForm() {
                 </button>
             </form>
 
-            <div className="mt-8 text-center text-sm text-slate-500">
+            <div className="mt-8 text-center text-sm text-yellow-50/50">
                 Need portal access? <a href="mailto:admin@weavestream.com?subject=Coach%20Portal%20Access%20Request" className="text-amber-500 hover:underline">Contact Admin</a>
             </div>
         </div>
@@ -130,8 +130,8 @@ function CoachLoginForm() {
 
 export default function CoachLogin() {
     return (
-        <main className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white relative">
-            <Link href="/login" className="absolute top-8 left-8 text-slate-500 hover:text-white flex items-center gap-2 transition-colors">
+        <main className="min-h-screen bg-[#0f0804] flex flex-col items-center justify-center p-6 text-white relative">
+            <Link href="/login" className="absolute top-8 left-8 text-yellow-50/50 hover:text-white flex items-center gap-2 transition-colors">
                 <ArrowLeft size={20} />
                 <span>Back to Roles</span>
             </Link>

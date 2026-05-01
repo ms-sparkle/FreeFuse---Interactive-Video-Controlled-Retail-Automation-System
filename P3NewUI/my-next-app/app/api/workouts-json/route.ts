@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
-import workoutsData from '@/data/workouts.json';
+import getDb from '@/lib/db';
 
 export async function GET() {
-  const exercises = workoutsData.exercises.map((e, i) => ({
-    WorkoutID: i + 1,
-    WorkoutName: e.name,
-    BodyPartName: e.primary_nodes.join(', '),
-  }));
+  const db = getDb();
+  const exercises = db.prepare(`
+    SELECT w.WorkoutID, w.WorkoutName, bp.BodyPartName
+    FROM WORKOUT w
+    LEFT JOIN BODYPART bp ON bp.BodyPartID = w.BodyPartID
+    ORDER BY w.WorkoutName
+  `).all() as { WorkoutID: number; WorkoutName: string; BodyPartName: string }[];
   return NextResponse.json({ exercises });
 }

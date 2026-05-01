@@ -10,7 +10,8 @@ import { User,
   Settings, 
   Plus, 
   UserMinus, 
-  ChevronLeft } from 'lucide-react';
+  ChevronLeft,
+  ClipboardList } from 'lucide-react';
 import RestrictWorkouts from '../components/RestrictWorkouts';
 import { WorkoutSuggestionCard, AddToTrainingPlanModal, JsonWorkout } from '../components/TrainingPlanModal';
 import workoutsData from '@/data/workouts.json';
@@ -44,9 +45,11 @@ type PlayerDetail = {
   latestReport: { ProgressScore: number; InjuryRiskScore: number; ReportDate: string } | null;
   sorenessEntries: { BodyPartName: string; Side: string; SorenessLevel: number }[];
   workoutSuggestions: { WorkoutName: string; Duration: number; Reps: number; BodyPartName: string }[];
+  selectedPreset: string | null;
 };
 
 type CoachNote = { NoteID: number; NoteDate: string; NoteText: string };
+
 
 /* --- MODAL COMPONENT --- */
 const ManageRosterModal = ({ 
@@ -68,22 +71,22 @@ const ManageRosterModal = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
+      <div className="bg-[#160e06] border border-amber-800/50 w-full max-w-md rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
         
         {/* Header */}
         <div className="p-6 border-b border-slate-800 flex justify-between items-center">
           <h2 className="text-xl font-bold flex items-center gap-2">
-            <Settings className="text-cyan-400" size={20} />
+            <Settings className="text-amber-400" size={20} />
             Manage Roster
           </h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
+          <button onClick={onClose} className="text-yellow-50/70 hover:text-white transition-colors">
             <ChevronLeft size={24} />
           </button>
         </div>
 
         {/* Invite Section */}
-        <div className="p-6 border-b border-slate-800 bg-slate-950/50">
-          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 block">
+        <div className="p-6 border-b border-amber-800/50 bg-[#0f0804]/80">
+          <label className="text-xs font-bold text-yellow-50/70 uppercase tracking-widest mb-2 block">
             Invite New Athlete
           </label>
           <div className="flex gap-2">
@@ -92,11 +95,11 @@ const ManageRosterModal = ({
               placeholder="Username or Email..." 
               value={inviteValue}
               onChange={(e) => setInviteValue(e.target.value)}
-              className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-cyan-500"
+              className="flex-1 bg-[#221408] border border-amber-800/60 rounded-lg px-4 py-2 text-sm text-yellow-50 focus:outline-none focus:border-amber-500"
             />
             <button 
               onClick={() => { onInvite(inviteValue); setInviteValue(''); }}
-              className="bg-cyan-600 hover:bg-cyan-500 text-black p-2 rounded-lg transition-colors"
+              className="bg-amber-600 hover:bg-amber-500 text-black p-2 rounded-lg transition-colors"
             >
               <Plus size={20} />
             </button>
@@ -105,15 +108,15 @@ const ManageRosterModal = ({
 
         {/* Athlete List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest px-2 mb-2 block">
+          <label className="text-xs font-bold text-yellow-50/70 uppercase tracking-widest px-2 mb-2 block">
             Current Athletes ({athletes.length})
           </label>
           {athletes.map(athlete => (
-            <div key={athlete.PersonID} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-slate-800 group hover:border-red-500/50 transition-colors">
+            <div key={athlete.PersonID} className="flex items-center justify-between p-3 rounded-xl bg-[#221408]/60 border border-amber-900/40 group hover:border-red-500/50 transition-colors">
               <span className="text-sm font-medium">{athlete.FirstName} {athlete.LastName}</span>
               <button 
                 onClick={() => onRemove(athlete.PersonID)}
-                className="text-slate-500 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-500/10 transition-all"
+                className="text-yellow-50/70 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-500/10 transition-all"
                 title="Remove from roster"
               >
                 <UserMinus size={18} />
@@ -292,34 +295,34 @@ export default function CoachDashboard() {
 
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex overflow-hidden">
+    <main className="min-h-screen bg-[#0f0804] text-white flex overflow-hidden">
 
       {/* --- LEFT PANEL: ROSTER --- */}
-      <div className="w-1/3 border-r border-slate-800 bg-slate-900/50 flex flex-col">
+      <div className="w-1/3 border-r border-amber-900/40 bg-[#160e06]/80 flex flex-col">
 
         {/* Header */}
         <div className="p-6 border-b border-slate-800">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-              <Activity className="text-cyan-400" />
+              <Activity className="text-amber-400" />
               Team Roster
             </h1>
             <button
               onClick={logout}
-              className="flex items-center gap-1.5 text-slate-500 hover:text-white transition-colors text-sm"
+              className="flex items-center gap-1.5 text-yellow-50/70 hover:text-white transition-colors text-sm"
               title="Logout"
             >
               <LogOut size={16} />
               Logout
             </button>
           </div>
-          <p className="text-slate-400 text-sm mt-1">{coachName || 'Coach Dashboard'}</p>
+          <p className="text-yellow-50 text-sm mt-1">{coachName || 'Coach Dashboard'}</p>
         </div>
 
         {/* List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {roster.length === 0 && (
-            <p className="text-slate-500 text-sm text-center mt-8">No athletes assigned</p>
+            <p className="text-yellow-50/70 text-sm text-center mt-8">No athletes assigned</p>
           )}
           {roster.map((athlete) => {
             const atRisk = (athlete.InjuryRiskScore ?? 0) > 0;
@@ -329,8 +332,8 @@ export default function CoachDashboard() {
                 onClick={() => setSelectedId(athlete.PersonID)}
                 className={`p-4 rounded-xl border cursor-pointer transition-all flex items-center justify-between group
                   ${selectedId === athlete.PersonID
-                    ? 'bg-slate-800 border-cyan-500 shadow-lg'
-                    : 'bg-slate-900 border-slate-800 hover:border-slate-600'
+                    ? 'bg-[#321d08] border-amber-500 shadow-lg shadow-amber-700/50'
+                    : 'bg-[#221408] border-amber-900/60 hover:border-amber-800'
                   }`}
               >
                 <div className="flex items-center gap-4">
@@ -340,14 +343,14 @@ export default function CoachDashboard() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-white">{athlete.FirstName} {athlete.LastName}</h3>
-                    <p className="text-xs text-slate-400 uppercase tracking-wider">{athlete.SportPlayed} · {athlete.Team}</p>
+                    <p className="text-xs text-yellow-50 uppercase tracking-wider">{athlete.SportPlayed} · {athlete.Team}</p>
                   </div>
                 </div>
 
                 {atRisk ? (
                   <AlertTriangle className="text-red-500 w-5 h-5 animate-pulse" />
                 ) : (
-                  <CheckCircle className="text-slate-600 w-5 h-5" />
+                  <CheckCircle className="text-yellow-400/50 w-5 h-5" />
                 )}
               </div>
             );
@@ -355,10 +358,10 @@ export default function CoachDashboard() {
         </div>
 
       {/* --- NEW: MANAGE ROSTER BUTTON --- */}
-        <div className="p-4 border-t border-slate-800 bg-slate-900/80">
+        <div className="p-4 border-t border-amber-900/40 bg-[#160e06]/80">
             <button 
                 onClick={() => setIsManagingRoster(true)}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-slate-800 border border-slate-700 hover:bg-cyan-600 hover:border-cyan-500 hover:text-black transition-all font-semibold"
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#221408] border border-amber-800/60 text-yellow-300 hover:bg-amber-700 hover:border-amber-600 hover:text-yellow-50 transition-all font-semibold"
             >
                 <Settings size={18} />
                 Manage Team Roster
@@ -375,9 +378,9 @@ export default function CoachDashboard() {
       />
 
       {/* --- RIGHT PANEL: COMMAND CENTER --- */}
-      <div className="w-2/3 bg-slate-950 p-10 flex flex-col h-screen overflow-y-auto">
+      <div className="w-2/3 bg-[#0f0804]/90 p-10 flex flex-col h-screen overflow-y-auto">
         {loadingDetail ? (
-          <div className="h-full flex items-center justify-center text-slate-500">Loading…</div>
+          <div className="h-full flex items-center justify-center text-yellow-50/70">Loading…</div>
         ) : activeAthlete && detail ? (
           <div className="animate-in fade-in slide-in-from-right-8 duration-500">
 
@@ -388,9 +391,9 @@ export default function CoachDashboard() {
                   {detail.player.FirstName} {detail.player.LastName}
                 </h2>
                 <div className="flex gap-3">
-                  <span className="px-3 py-1 bg-slate-800 rounded text-sm text-slate-300">{detail.player.SportPlayed}</span>
-                  <span className="px-3 py-1 bg-slate-800 rounded text-sm text-slate-300">{detail.player.Team}</span>
-                  <span className="px-3 py-1 bg-slate-800 rounded text-sm text-slate-300">
+                  <span className="px-3 py-1 bg-[#221408] border border-amber-900/50 rounded text-sm text-yellow-50">{detail.player.SportPlayed}</span>
+                  <span className="px-3 py-1 bg-[#221408] border border-amber-900/50 rounded text-sm text-yellow-50">{detail.player.Team}</span>
+                  <span className="px-3 py-1 bg-[#221408] border border-amber-900/50 rounded text-sm text-yellow-50">
                     {detail.player.Height}&quot; · {detail.player.Weight} lbs
                   </span>
                 </div>
@@ -404,7 +407,7 @@ export default function CoachDashboard() {
                   {(detail.latestReport?.InjuryRiskScore ?? 0) > 0 ? <AlertTriangle /> : <CheckCircle />}
                 </div>
                 {detail.latestReport && (
-                  <div className="text-xs text-slate-400 mt-1">
+                  <div className="text-xs text-yellow-50 mt-1">
                     Progress: {detail.latestReport.ProgressScore} · Last check-in: {detail.latestReport.ReportDate}
                   </div>
                 )}
@@ -415,10 +418,10 @@ export default function CoachDashboard() {
             <div className="grid grid-cols-2 gap-10">
 
               {/* 1. Soreness report */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 relative overflow-hidden">
-                <h3 className="text-slate-400 text-sm uppercase font-bold mb-6">Soreness Report</h3>
+              <div className="bg-[#221408]/40 border border-amber-800/40 rounded-2xl p-6 relative overflow-hidden">
+                <h3 className="text-yellow-50 text-sm uppercase font-bold mb-6">Soreness Report</h3>
 
-                <div className="relative min-h-[200px] flex flex-col gap-3 bg-slate-950 rounded-xl border border-slate-800/50 p-4">
+                <div className="relative min-h-[200px] flex flex-col gap-3 bg-[#0f0804]/70 rounded-xl border border-amber-800/30 p-4">
                   {detail.sorenessEntries.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-32 text-green-500">
                       <CheckCircle size={48} className="mb-2 opacity-50" />
@@ -441,12 +444,12 @@ export default function CoachDashboard() {
               </div>
 
               {/* 2. Workout suggestions */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <div className="bg-[#221408]/40 border border-amber-800/40 rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-slate-400 text-sm uppercase font-bold">Suggested Session Plan</h3>
+                  <h3 className="text-yellow-50 text-sm uppercase font-bold">Suggested Session Plan</h3>
                   <button
                     onClick={() => setShowAddWorkoutModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-black text-xs font-bold transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-black text-xs font-bold transition-colors"
                   >
                     <Plus size={13} />
                     Add workout
@@ -464,6 +467,7 @@ export default function CoachDashboard() {
                       }}
                       athleteId={selectedId!}
                       allWorkouts={allJsonWorkouts}
+                      onSuccess={undefined}
                     />
                   ))}
                 </div>
@@ -479,45 +483,89 @@ export default function CoachDashboard() {
 
             </div>
 
+            {/* Training Plan: Preset + Daily Suggestions */}
+            <div className="mt-10 bg-[#221408]/40 border border-amber-800/40 rounded-2xl p-6">
+              <h3 className="text-yellow-50 text-sm uppercase font-bold flex items-center gap-2 mb-5">
+                <ClipboardList size={14} className="text-amber-400" />
+                Training Plan
+              </h3>
+
+              {/* Selected preset badge */}
+              <div className="mb-5">
+                <p className="text-xs font-bold text-yellow-50/60 uppercase tracking-widest mb-2">Selected Protocol</p>
+                {detail.selectedPreset ? (
+                  <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-600/20 border border-amber-600/50 text-amber-300 text-sm font-semibold">
+                    {{
+                      'upper-body': '🏋️ Upper Body Power',
+                      'lower-body': '⚡ Lower Body Strength',
+                      'core-stability': '🛡️ Core Stability & Flow',
+                    }[detail.selectedPreset] ?? detail.selectedPreset}
+                  </span>
+                ) : (
+                  <span className="text-yellow-50/30 text-sm italic">No protocol selected yet</span>
+                )}
+              </div>
+
+              {/* Daily suggested workouts */}
+              <p className="text-xs font-bold text-yellow-50/60 uppercase tracking-widest mb-3">Daily Suggested Workouts</p>
+              <div className="min-h-[80px] bg-[#0f0804]/70 rounded-xl border border-amber-800/30 p-3 flex flex-col gap-2">
+                {detail.workoutSuggestions.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-16 text-yellow-50/30 text-xs gap-1">
+                    <ClipboardList size={20} className="opacity-30" />
+                    No suggestions available
+                  </div>
+                ) : (
+                  detail.workoutSuggestions.map((w, i) => (
+                    <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg border border-amber-800/30 bg-[#221408]/60">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-yellow-50 truncate">{w.WorkoutName}</p>
+                        <p className="text-[10px] text-yellow-50/50 mt-0.5">{w.BodyPartName} · {w.Duration} min · {w.Reps} reps</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
             {/* Coach Notes */}
-            <div className="mt-10 bg-slate-900 border border-slate-800 rounded-2xl p-6">
-              <h3 className="text-slate-400 text-sm uppercase font-bold mb-4">Notes for {detail.player.FirstName}</h3>
+            <div className="mt-10 bg-[#221408]/40 border border-amber-800/40 rounded-2xl p-6">
+              <h3 className="text-yellow-50 text-sm uppercase font-bold mb-4">Notes for {detail.player.FirstName}</h3>
               <div className="mb-4">
                 <textarea
                   value={coachNoteText}
                   onChange={e => setCoachNoteText(e.target.value)}
                   placeholder={`Write a note for ${detail.player.FirstName}…`}
                   rows={3}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-[#221408] border border-amber-800/60 rounded-lg px-3 py-2 text-sm text-yellow-50 resize-none focus:outline-none focus:border-amber-500"
                 />
                 <div className="flex justify-end mt-2">
                   <button
                     onClick={addCoachNote}
                     disabled={savingCoachNote || !coachNoteText.trim()}
-                    className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-semibold text-sm transition-colors"
+                    className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-semibold text-sm transition-colors"
                   >
                     {savingCoachNote ? 'Saving…' : 'Add Note'}
                   </button>
                 </div>
               </div>
               {coachNotes.length === 0 ? (
-                <p className="text-slate-600 text-sm">No notes yet for this athlete.</p>
+                <p className="text-yellow-400/50 text-sm">No notes yet for this athlete.</p>
               ) : (
                 <div className="space-y-3">
                   {coachNotes.map(note => (
-                    <div key={note.NoteID} className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-3">
+                    <div key={note.NoteID} className="rounded-xl border border-amber-800/40 bg-[#0f0804]/70 px-4 py-3">
                       <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs text-slate-500">{note.NoteDate}</p>
+                        <p className="text-xs text-yellow-50/70">{note.NoteDate}</p>
                         <div className="flex gap-3">
                           <button
                             onClick={() => { setEditingCoachNoteId(note.NoteID); setEditingCoachNoteText(note.NoteText); }}
-                            className="text-xs text-slate-400 hover:text-cyan-400 transition-colors"
+                            className="text-xs text-yellow-50 hover:text-amber-400 transition-colors"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => deleteCoachNote(note.NoteID)}
-                            className="text-xs text-slate-400 hover:text-red-400 transition-colors"
+                            className="text-xs text-yellow-50 hover:text-red-400 transition-colors"
                           >
                             Delete
                           </button>
@@ -529,26 +577,26 @@ export default function CoachDashboard() {
                             value={editingCoachNoteText}
                             onChange={e => setEditingCoachNoteText(e.target.value)}
                             rows={3}
-                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-cyan-500 mt-1"
+                            className="w-full bg-[#221408] border border-amber-800/60 rounded-lg px-3 py-2 text-sm text-yellow-50 resize-none focus:outline-none focus:border-amber-500 mt-1"
                           />
                           <div className="flex justify-end gap-2 mt-2">
                             <button
                               onClick={() => { setEditingCoachNoteId(null); setEditingCoachNoteText(''); }}
-                              className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg border border-slate-700 transition-colors"
+                              className="text-xs text-yellow-50/60 hover:text-white px-3 py-1.5 rounded-lg border border-amber-800/60 transition-colors"
                             >
                               Cancel
                             </button>
                             <button
                               onClick={() => saveEditedCoachNote(note.NoteID)}
                               disabled={!editingCoachNoteText.trim()}
-                              className="text-xs px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-semibold transition-colors"
+                              className="text-xs px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-semibold transition-colors"
                             >
                               Save
                             </button>
                           </div>
                         </div>
                       ) : (
-                        <p className="text-sm text-slate-200 whitespace-pre-wrap">{note.NoteText}</p>
+                        <p className="text-sm text-yellow-50 whitespace-pre-wrap">{note.NoteText}</p>
                       )}
                     </div>
                   ))}
@@ -567,7 +615,7 @@ export default function CoachDashboard() {
 
           </div>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-slate-600">
+          <div className="h-full flex flex-col items-center justify-center text-yellow-400/50">
             <User className="w-20 h-20 mb-4 opacity-20" />
             <p>Select an athlete from the roster to view readiness.</p>
           </div>

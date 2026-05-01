@@ -38,11 +38,25 @@ export default function WorkoutPresets() {
         }
     ];
 
-    const handleSelectPreset = (presetId: string) => {
-        // Save the chosen preset so the dashboard can read it and update the workouts
+    const handleSelectPreset = async (presetId: string) => {
+        // Save to localStorage for the player dashboard
         localStorage.setItem('selectedPreset', presetId);
 
-        // Route back to the dashboard instead of starting the workout
+        // Persist to DB so coaches can see it
+        try {
+            const raw = localStorage.getItem('session');
+            if (raw) {
+                const session = JSON.parse(raw);
+                await fetch(`/api/player/${session.personId}/preset`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ preset: presetId }),
+                });
+            }
+        } catch {
+            // Non-critical — localStorage is still set
+        }
+
         router.push('/player-dashboard');
     };
 

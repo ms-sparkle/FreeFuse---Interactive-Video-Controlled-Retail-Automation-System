@@ -58,6 +58,12 @@ export async function GET(
 
     const db = getDb();
 
+    // Migration: add SelectedPreset column to ATHLETE if not yet present
+    const cols = db.pragma('table_info(ATHLETE)') as { name: string }[];
+    if (!cols.some(c => c.name === 'SelectedPreset')) {
+      db.exec('ALTER TABLE "ATHLETE" ADD COLUMN "SelectedPreset" TEXT');
+    }
+
     // Person + athlete info
     const player = db.prepare(`
       SELECT
@@ -70,7 +76,8 @@ export async function GET(
         a.Sex,
         a.Height,
         a.Weight,
-        a.HoursSpentWorkingOut
+        a.HoursSpentWorkingOut,
+        a.SelectedPreset
       FROM PERSON p
       JOIN ATHLETE a ON a.PersonID = p.PersonID
       WHERE p.PersonID = ?
@@ -191,6 +198,7 @@ export async function GET(
       sorenessEntries,
       workoutSuggestions,
       sessions,
+      selectedPreset: (player as { SelectedPreset?: string | null }).SelectedPreset ?? null,
     });
   } catch (err) {
     console.error('Player fetch error:', err);

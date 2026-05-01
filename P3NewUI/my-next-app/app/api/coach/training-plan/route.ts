@@ -1,6 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
 import getDb from '@/lib/db';
- 
+
+// GET /api/coach/training-plan?athleteId=X
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const athleteId = searchParams.get('athleteId');
+
+  if (!athleteId) {
+    return NextResponse.json({ error: 'athleteId required' }, { status: 400 });
+  }
+
+  const db = getDb();
+
+  const sessions = db.prepare(`
+    SELECT
+      ws.SessionID,
+      ws.SessionDate,
+      ws.Notes,
+      w.WorkoutName
+    FROM WORKOUT_SESSION ws
+    JOIN WORKOUT w ON w.WorkoutID = ws.WorkoutID
+    WHERE ws.AthletePersonID = ?
+    ORDER BY ws.SessionDate DESC, ws.SessionID DESC
+  `).all(Number(athleteId)) as {
+    SessionID: number;
+    SessionDate: string;
+    WorkoutName: string;
+    Notes: string | null;
+  }[];
+
+  return NextResponse.json({ sessions });
+}
+
+// DELETE /api/coach/training-plan
+// Body: { sessionId }
+export async function DELETE(req: NextRequest) {
+  const { sessionId } = await req.json() as { sessionId?: number };
+
+  if (!sessionId) {
+    return NextResponse.json({ error: 'sessionId required' }, { status: 400 });
+  }
+
+  const db = getDb();
+
+  const existing = db.prepare('SELECT SessionID FROM WORKOUT_SESSION WHERE SessionID = ?').get(sessionId);
+  if (!existing) {
+    return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+  }
+
+  db.prepare('DELETE FROM WORKOUT_SESSION WHERE SessionID = ?').run(sessionId);
+  return NextResponse.json({ ok: true });
+}
+
 type RequestBody = {
   athleteId?: number;
   workoutName?: string;
